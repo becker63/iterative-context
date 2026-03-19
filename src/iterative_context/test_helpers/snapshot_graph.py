@@ -83,6 +83,22 @@ def normalize_graph(graph: Any) -> dict[str, list[dict[str, Any]]]:
     return {"nodes": nodes, "edges": edges}
 
 
+def render_steps(steps: list[dict[str, Any]]) -> str:
+    """Serialize a list of steps (event + graph) for snapshot testing."""
+    rendered_steps = json.dumps(
+        [
+            {
+                "event": step["event"],
+                "graph": normalize_graph(step["graph"]),  # type: ignore[arg-type]
+            }
+            for step in steps
+        ],
+        sort_keys=True,
+        indent=2,
+    )
+    return rendered_steps
+
+
 def normalize_event(event: GraphEvent) -> dict[str, Any]:
     """Normalize a ``GraphEvent`` into a concise, deterministic dict."""
     if isinstance(event, AddNodesEvent):
@@ -143,6 +159,7 @@ __all__ = [
     "normalize_node",
     "normalize_edge",
     "normalize_graph",
+    "render_steps",
     "normalize_event",
     "GraphSnapshot",
 ]

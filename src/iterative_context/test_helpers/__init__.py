@@ -11,7 +11,7 @@ from .graph_dsl import (
     replay_with_event_snapshots,
     replay_with_snapshots,
 )
-from .snapshot_graph import GraphSnapshot, normalize_graph
+from .snapshot_graph import GraphSnapshot, normalize_graph, render_steps
 
 __all__ = [
     "EventSpec",
@@ -23,4 +23,5 @@ __all__ = [
     "replay_with_snapshots",
     "GraphSnapshot",
     "normalize_graph",
+    "render_steps",
 ]

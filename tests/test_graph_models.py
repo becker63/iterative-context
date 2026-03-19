@@ -1,8 +1,6 @@
 # pyright: reportMissingTypeStubs=false, reportMissingImports=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false
 """Tests for the deterministic graph DSL and snapshot integration."""
 
-import json
-
 from pytest_snapshot.plugin import Snapshot
 
 from iterative_context.test_helpers import (
@@ -10,7 +8,7 @@ from iterative_context.test_helpers import (
     GraphSnapshot,
     GraphType,
     build_graph,
-    normalize_graph,
+    render_steps,
     replay_with_event_snapshots,
 )
 
@@ -40,15 +38,5 @@ def test_edge_and_events(snapshot_graph: GraphSnapshot, snapshot: Snapshot):
     steps = replay_with_event_snapshots(g, events)
     final_graph = steps[-1]["graph"]
     snapshot_graph.assert_graph(final_graph)  # type: ignore[arg-type]
-    rendered_steps = json.dumps(
-        [
-            {
-                "event": step["event"],
-                "graph": normalize_graph(step["graph"]),  # type: ignore[arg-type]
-            }
-            for step in steps
-        ],
-        sort_keys=True,
-        indent=2,
-    )
+    rendered_steps = render_steps(steps)
     snapshot.assert_match(rendered_steps, "event_graph_steps")
