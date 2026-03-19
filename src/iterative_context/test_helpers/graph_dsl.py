@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping
 from typing import Any, Literal, NotRequired, TypedDict, cast
 
@@ -132,10 +133,23 @@ def apply_events(graph: GraphType, events: list[EventSpec]) -> GraphType:
 
 def replay_with_snapshots(graph: GraphType, events: list[EventSpec]) -> list[GraphType]:
     """Apply events stepwise, returning graph copies after each step (including initial)."""
-    snapshots: list[GraphType] = [graph.copy()]
+    snapshots: list[GraphType] = [copy.deepcopy(graph)]
     for event in events:
         apply_events(graph, [event])
-        snapshots.append(graph.copy())
+        snapshots.append(copy.deepcopy(graph))
+    return snapshots
+
+
+def replay_with_event_snapshots(
+    graph: GraphType, events: list[EventSpec]
+) -> list[dict[str, GraphType | EventSpec | None]]:
+    """Apply events stepwise, returning event-state pairs (initial state included)."""
+    snapshots: list[dict[str, GraphType | EventSpec | None]] = [
+        {"event": None, "graph": copy.deepcopy(graph)}
+    ]
+    for event in events:
+        apply_events(graph, [event])
+        snapshots.append({"event": event, "graph": copy.deepcopy(graph)})
     return snapshots
 
 
@@ -143,6 +157,7 @@ __all__ = [
     "build_graph",
     "apply_events",
     "replay_with_snapshots",
+    "replay_with_event_snapshots",
     "GraphSpec",
     "EventSpec",
     "GraphType",

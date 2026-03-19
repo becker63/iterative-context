@@ -12,7 +12,6 @@ from iterative_context.graph_models import (
     GraphEdge,
     GraphEvent,
     GraphNode,
-    # IterationEvent is not directly used; removed to avoid unused import.
     UpdateNodeEvent,
 )
 
@@ -98,11 +97,9 @@ def normalize_event(event: GraphEvent) -> dict[str, Any]:
         return {"type": "addEdges", "edges": edges}
 
     if isinstance(event, UpdateNodeEvent):
-        # Drop ``None`` values from the patch; keep the structure as‑is otherwise.
         patch = _remove_none(event.patch)
         return {"type": "updateNode", "id": event.id, "patch": patch}
 
-    # IterationEvent has only the ``step`` field.
     return {"type": "iteration", "step": event.step}
 
 
@@ -115,14 +112,11 @@ class GraphSnapshot:
 
     def _next_name(self, prefix: str, identifier: str | None = None) -> str:
         """Generate a deterministic snapshot name."""
-        # For node, edge, and events use a simple incrementing counter to keep
-        # compatibility with existing snapshot files.
         if prefix in ("node", "edge", "events"):
             self._counter += 1
             return f"{prefix}_{self._counter}"
         if prefix == "graph":
             return "graph"
-        # Fallback – should not occur.
         self._counter += 1
         return f"{prefix}_{self._counter}"
 
@@ -136,7 +130,6 @@ class GraphSnapshot:
 
     def assert_events(self, events: list[GraphEvent]) -> None:  # type: ignore[arg-type]
         normalized = [normalize_event(ev) for ev in events]
-        # Ensure deterministic order of events as they appear in the list.
         self._assert(normalized, self._next_name("events"))
 
     def assert_node(self, node: GraphNode) -> None:  # type: ignore[arg-type]
@@ -146,4 +139,10 @@ class GraphSnapshot:
         self._assert(normalize_edge(edge), self._next_name("edge", f"{edge.source}_{edge.target}"))
 
 
-# Duplicate fixture removed; snapshot_graph is provided via conftest.py.
+__all__ = [
+    "normalize_node",
+    "normalize_edge",
+    "normalize_graph",
+    "normalize_event",
+    "GraphSnapshot",
+]
