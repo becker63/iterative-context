@@ -1,0 +1,54 @@
+[project]
+name = "iterative-context"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "networkx>=3.0",
+    "pydantic>=2.0",
+    "rx>=3.0",
+    "pytest>=8.0",
+    "pytest-snapshot>=0.9",
+    "rxpy>=0.1.0",
+    "basedpyright>=1.5.0",
+    "ruff>=0.4.0",
+]
+packages = [{ include = "iterative_context", from = "src" }]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "B",   # bugbear
+    "I",   # import sorting
+    "UP",  # pyupgrade
+    "C4",  # comprehensions
+    "SIM", # simplifications
+    "PL",  # pylint rules
+]
+
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004"]  # allow magic values in tests
+
+[tool.uv.workspace]
+members = [
+    ".",
+]
+
+[tool.uv.sources]
+iterative-context = { workspace = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "iterative-context",
+]

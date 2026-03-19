@@ -1,0 +1,905 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  iterative_context/
+    __init__.py
+    graph_models.py
+tests/
+  snapshots/
+    test_graph_models/
+      test_edge_and_events/
+        graph
+      test_node_variants/
+        graph
+  conftest.py
+  graph_dsl.py
+  snapshot_graph.py
+  test_graph_models.py
+.gitignore
+.python-version
+AGENTS.md
+flake.lock
+flake.nix
+pyproject.toml
+pyrightconfig.json
+README.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/iterative_context/__init__.py">
+"""Iterative Context package exports."""
+
+from .graph_models import (  # noqa: F401
+    AddEdgesEvent,
+    AddNodesEvent,
+    AnchorNode,
+    Evidence,
+    Graph,
+    GraphEdge,
+    GraphEvent,
+    GraphNode,
+    IterationEvent,
+    PendingNode,
+    PrunedNode,
+    ResolvedNode,
+    UpdateNodeEvent,
+    create_event_subject,
+)
+
+__all__ = [
+    "GraphNode",
+    "GraphEdge",
+    "GraphEvent",
+    "Graph",
+    "create_event_subject",
+    "AddNodesEvent",
+    "AddEdgesEvent",
+    "UpdateNodeEvent",
+    "IterationEvent",
+    "PendingNode",
+    "PrunedNode",
+    "AnchorNode",
+    "ResolvedNode",
+    "Evidence",
+]
+</file>
+
+<file path="src/iterative_context/graph_models.py">
+# iterative-context/graph_models.py
+
+from __future__ import annotations
+
+from typing import Annotated, Any, Literal
+
+import networkx as nx
+from pydantic import BaseModel, Field
+from rx.subject.subject import Subject
+
+# Public alias for the directed graph type used throughout the system.
+Graph = nx.DiGraph
+
+# ----------------------------------------------------------------------
+# Core node definitions
+# ----------------------------------------------------------------------
+
+
+class BaseNode(BaseModel):
+    """Common fields for all graph nodes."""
+
+    id: str
+    label: str | None = None
+    kind: Literal["symbol", "function", "file", "type"]
+
+
+class PendingNode(BaseNode):
+    state: Literal["pending"] = "pending"
+
+
+class PrunedNode(BaseNode):
+    state: Literal["pruned"] = "pruned"
+
+
+class Evidence(BaseModel):
+    """Evidence attached to anchor / resolved nodes."""
+
+    snippet: str
+    file: str | None = None
+    startLine: int | None = None
+
+
+class AnchorNode(BaseNode):
+    state: Literal["anchor"] = "anchor"
+    tokens: int | None = None
+    evidence: Evidence | None = None
+
+
+class ResolvedNode(BaseNode):
+    state: Literal["resolved"] = "resolved"
+    tokens: int
+    evidence: Evidence
+
+
+# Union of all node variants – discriminated by the ``state`` field.
+GraphNode = Annotated[
+    PendingNode | PrunedNode | AnchorNode | ResolvedNode,
+    Field(discriminator="state"),
+]
+
+
+# ----------------------------------------------------------------------
+# Edge definition
+# ----------------------------------------------------------------------
+
+
+class GraphEdge(BaseModel):
+    """Directed edge between two nodes."""
+
+    id: str | None = None
+    source: str
+    target: str
+    kind: Literal["calls", "imports", "references"]
+    primary: bool | None = None
+
+
+# ----------------------------------------------------------------------
+# Event definitions – each variant is discriminated by the ``type`` field.
+# ----------------------------------------------------------------------
+
+
+class AddNodesEvent(BaseModel):
+    type: Literal["addNodes"] = "addNodes"
+    nodes: list[GraphNode]
+    reason: str | None = None
+
+
+class AddEdgesEvent(BaseModel):
+    type: Literal["addEdges"] = "addEdges"
+    edges: list[GraphEdge]
+    reason: str | None = None
+
+
+class UpdateNodeEvent(BaseModel):
+    type: Literal["updateNode"] = "updateNode"
+    id: str
+    patch: dict[str, Any]  # Partial GraphNode representation
+
+
+class IterationEvent(BaseModel):
+    type: Literal["iteration"] = "iteration"
+    step: int
+    description: str | None = None
+
+
+# Union of all supported events – with discriminator
+GraphEvent = Annotated[
+    AddNodesEvent | AddEdgesEvent | UpdateNodeEvent | IterationEvent,
+    Field(discriminator="type"),
+]
+
+
+def create_event_subject() -> Subject:
+    """Create a deterministic RxPY Subject for emitting GraphEvents."""
+    return Subject()
+
+
+__all__ = [
+    "GraphNode",
+    "GraphEdge",
+    "GraphEvent",
+    "Graph",
+    "create_event_subject",
+]
+</file>
+
+<file path="tests/snapshots/test_graph_models/test_edge_and_events/graph">
+{
+  "edges": [
+    {
+      "kind": "calls",
+      "source": "n1",
+      "target": "n2"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "kind": "symbol",
+      "state": "pending"
+    },
+    {
+      "id": "n2",
+      "kind": "symbol",
+      "state": "pending"
+    },
+    {
+      "id": "n5",
+      "kind": "symbol",
+      "state": "resolved",
+      "tokens": 3
+    }
+  ]
+}
+</file>
+
+<file path="tests/snapshots/test_graph_models/test_node_variants/graph">
+{
+  "edges": [],
+  "nodes": [
+    {
+      "id": "n1",
+      "kind": "symbol",
+      "state": "pending"
+    }
+  ]
+}
+</file>
+
+<file path="tests/conftest.py">
+# pyright: reportMissingTypeStubs=false
+import os
+import sys
+
+import pytest
+from pytest_snapshot.plugin import Snapshot
+
+# Ensure the directory containing this file is on sys.path so we can import
+# the local ``snapshot_graph`` module directly.
+sys.path.append(os.path.dirname(__file__))
+
+from snapshot_graph import GraphSnapshot
+
+
+@pytest.fixture
+def snapshot_graph(snapshot: Snapshot) -> GraphSnapshot:
+    """Provide a GraphSnapshot instance bound to the pytest‑snapshot fixture."""
+    return GraphSnapshot(snapshot)
+</file>
+
+<file path="tests/graph_dsl.py">
+# pyright: reportMissingTypeStubs=false
+"""Deterministic, declarative helpers for building and mutating graphs in tests."""
+
+from __future__ import annotations
+
+from typing import Any, Literal, NotRequired, TypedDict, cast
+
+import networkx as nx
+
+type GraphType = nx.DiGraph[Any]
+
+
+class EvidenceSpec(TypedDict):
+    snippet: str
+    file: NotRequired[str | None]
+    startLine: NotRequired[int | None]
+
+
+class NodeSpec(TypedDict):
+    id: str
+    kind: Literal["symbol", "function", "file", "type"]
+    state: Literal["pending", "pruned", "anchor", "resolved"]
+    label: NotRequired[str | None]
+    tokens: NotRequired[int | None]
+    evidence: NotRequired[EvidenceSpec]
+
+
+class EdgeSpec(TypedDict):
+    source: str
+    target: str
+    kind: Literal["calls", "imports", "references"]
+    id: NotRequired[str | None]
+    primary: NotRequired[bool | None]
+
+
+class AddNodesEventSpec(TypedDict):
+    type: Literal["addNodes"]
+    nodes: list[str]
+    reason: NotRequired[str | None]
+
+
+class AddEdgesEventSpec(TypedDict):
+    type: Literal["addEdges"]
+    edges: list[EdgeSpec]
+    reason: NotRequired[str | None]
+
+
+class UpdateNodeEventSpec(TypedDict):
+    type: Literal["updateNode"]
+    id: str
+    patch: dict[str, Any]
+
+
+class IterationEventSpec(TypedDict):
+    type: Literal["iteration"]
+    step: int
+    description: NotRequired[str | None]
+
+
+EventSpec = AddNodesEventSpec | AddEdgesEventSpec | UpdateNodeEventSpec | IterationEventSpec
+
+
+class GraphSpec(TypedDict, total=False):
+    nodes: list[NodeSpec]
+    edges: list[EdgeSpec]
+
+
+def _default_node(node_id: str) -> NodeSpec:
+    """Produce a minimal pending node spec for the given id."""
+    return {"id": node_id, "kind": "symbol", "state": "pending"}
+
+
+def build_graph(dsl: GraphSpec) -> GraphType:
+    """Construct a NetworkX DiGraph from a declarative DSL spec."""
+    graph: GraphType = nx.DiGraph()
+
+    for node in dsl.get("nodes", []):
+        graph.add_node(node["id"], **node)
+
+    for edge in dsl.get("edges", []):
+        edge_data = {k: v for k, v in edge.items() if k not in ("source", "target")}
+        graph.add_edge(edge["source"], edge["target"], kind=edge["kind"], **edge_data)
+
+    return graph
+
+
+def apply_events(graph: GraphType, events: list[EventSpec]) -> GraphType:
+    """Apply a sequence of DSL events to mutate the graph in place."""
+    for event in events:
+        event_type = event["type"]
+        if event_type == "addNodes":
+            add_nodes = cast(AddNodesEventSpec, event)
+            for node_id in add_nodes["nodes"]:
+                if node_id in graph.nodes:
+                    continue
+                graph.add_node(node_id, **_default_node(node_id))
+        elif event_type == "addEdges":
+            add_edges = cast(AddEdgesEventSpec, event)
+            for edge in add_edges["edges"]:
+                edge_data = {k: v for k, v in edge.items() if k not in ("source", "target", "kind")}
+                graph.add_edge(edge["source"], edge["target"], kind=edge["kind"], **edge_data)
+        elif event_type == "updateNode":
+            update_event = cast(UpdateNodeEventSpec, event)
+            node_id = update_event["id"]
+            if node_id not in graph.nodes:
+                graph.add_node(node_id, **_default_node(node_id))
+            graph.nodes[node_id].update(update_event["patch"])
+        elif event_type == "iteration":
+            # Iteration events are observational; no graph mutation required.
+            continue
+        else:
+            raise ValueError(f"Unknown event type '{event_type}'")
+    return graph
+
+
+__all__ = ["build_graph", "apply_events", "GraphSpec", "EventSpec", "GraphType"]
+</file>
+
+<file path="tests/snapshot_graph.py">
+# pyright: reportMissingTypeStubs=false
+import json
+from types import SimpleNamespace
+from typing import Any
+
+from pytest_snapshot.plugin import Snapshot
+
+from iterative_context.graph_models import (
+    AddEdgesEvent,
+    AddNodesEvent,
+    Graph,
+    GraphEdge,
+    GraphEvent,
+    GraphNode,
+    # IterationEvent is not directly used; removed to avoid unused import.
+    UpdateNodeEvent,
+)
+
+
+def _remove_none(d: dict[str, Any]) -> dict[str, Any]:
+    """Return a shallow copy of *d* without keys whose values are ``None``."""
+    return {k: v for k, v in d.items() if v is not None}
+
+
+def normalize_node(node: GraphNode) -> dict[str, Any]:
+    """Explicitly construct a deterministic snapshot for a GraphNode."""
+    out: dict[str, Any] = {
+        "id": node.id,
+        "kind": node.kind,
+        "state": node.state,
+    }
+    tokens = getattr(node, "tokens", None)
+    if tokens is not None:
+        out["tokens"] = tokens
+    evidence = getattr(node, "evidence", None)
+    if evidence is not None:
+        out["evidence"] = {
+            "snippet": evidence.snippet,
+            **({"file": evidence.file} if evidence.file is not None else {}),
+            **({"startLine": evidence.startLine} if evidence.startLine is not None else {}),
+        }
+    return out
+
+
+def normalize_edge(edge: GraphEdge) -> dict[str, Any]:
+    """Explicitly construct a deterministic snapshot for a GraphEdge."""
+    out: dict[str, Any] = {
+        "source": edge.source,
+        "target": edge.target,
+        "kind": edge.kind,
+    }
+    if hasattr(edge, "primary") and edge.primary is not None:
+        out["primary"] = edge.primary
+    return out
+
+
+def normalize_graph(graph: Any) -> dict[str, list[dict[str, Any]]]:
+    """Normalize a NetworkX DiGraph into a deterministic structure."""
+    nodes: list[dict[str, Any]] = []
+    for _, data in graph.nodes(data=True):
+        if isinstance(data, dict):
+            # Ensure required fields exist
+            for k in ("id", "kind", "state"):
+                if k not in data:
+                    raise ValueError(f"Node missing required field '{k}'")
+            tmp = SimpleNamespace(**data)
+            normalized = normalize_node(tmp)  # type: ignore[arg-type]
+        else:
+            normalized = normalize_node(data)  # type: ignore[arg-type]
+        nodes.append(normalized)
+
+    edges: list[dict[str, Any]] = []
+    for source, target, data in graph.edges(data=True):
+        if isinstance(data, dict):
+            # Merge source and target into the temporary namespace.
+            tmp = SimpleNamespace(source=source, target=target, **data)
+            edge_dict = normalize_edge(tmp)  # type: ignore[arg-type]
+        else:
+            edge_dict = normalize_edge(data)
+        edges.append(_remove_none(edge_dict))
+
+    nodes.sort(key=lambda n: n["id"])
+    edges.sort(key=lambda e: (e["source"], e["target"], e["kind"]))
+    return {"nodes": nodes, "edges": edges}
+
+
+def normalize_event(event: GraphEvent) -> dict[str, Any]:
+    """Normalize a ``GraphEvent`` into a concise, deterministic dict."""
+    if isinstance(event, AddNodesEvent):
+        return {
+            "type": "addNodes",
+            "nodes": sorted([node.id for node in event.nodes]),
+        }
+
+    if isinstance(event, AddEdgesEvent):
+        edges = [{"source": e.source, "target": e.target, "kind": e.kind} for e in event.edges]
+        edges.sort(key=lambda d: (d["source"], d["target"], d["kind"]))
+        return {"type": "addEdges", "edges": edges}
+
+    if isinstance(event, UpdateNodeEvent):
+        # Drop ``None`` values from the patch; keep the structure as‑is otherwise.
+        patch = _remove_none(event.patch)
+        return {"type": "updateNode", "id": event.id, "patch": patch}
+
+    # IterationEvent has only the ``step`` field.
+    return {"type": "iteration", "step": event.step}
+
+
+class GraphSnapshot:
+    """Wrapper around the ``snapshot`` fixture providing domain‑aware assertions."""
+
+    def __init__(self, snapshot: Snapshot) -> None:  # type: ignore[assignment]
+        self._snapshot = snapshot
+        self._counter = 0
+
+    def _next_name(self, prefix: str, identifier: str | None = None) -> str:
+        """Generate a deterministic snapshot name."""
+        # For node, edge, and events use a simple incrementing counter to keep
+        # compatibility with existing snapshot files.
+        if prefix in ("node", "edge", "events"):
+            self._counter += 1
+            return f"{prefix}_{self._counter}"
+        if prefix == "graph":
+            return "graph"
+        # Fallback – should not occur.
+        self._counter += 1
+        return f"{prefix}_{self._counter}"
+
+    def _assert(self, data: Any, name: str) -> None:
+        """Serialize *data* deterministically and forward to the underlying fixture."""
+        rendered = json.dumps(data, sort_keys=True, indent=2)
+        self._snapshot.assert_match(rendered, name)
+
+    def assert_graph(self, graph: Graph) -> None:  # type: ignore[arg-type]
+        self._assert(normalize_graph(graph), self._next_name("graph"))
+
+    def assert_events(self, events: list[GraphEvent]) -> None:  # type: ignore[arg-type]
+        normalized = [normalize_event(ev) for ev in events]
+        # Ensure deterministic order of events as they appear in the list.
+        self._assert(normalized, self._next_name("events"))
+
+    def assert_node(self, node: GraphNode) -> None:  # type: ignore[arg-type]
+        self._assert(normalize_node(node), self._next_name("node", node.id))
+
+    def assert_edge(self, edge: GraphEdge) -> None:  # type: ignore[arg-type]
+        self._assert(normalize_edge(edge), self._next_name("edge", f"{edge.source}_{edge.target}"))
+
+
+# Duplicate fixture removed; snapshot_graph is provided via conftest.py.
+</file>
+
+<file path="tests/test_graph_models.py">
+# pyright: reportMissingTypeStubs=false, reportMissingImports=false
+"""Tests for the deterministic graph DSL and snapshot integration."""
+
+from typing import Any, cast
+
+from graph_dsl import EventSpec, GraphType, apply_events, build_graph
+from snapshot_graph import GraphSnapshot
+
+
+def test_node_variants(snapshot_graph: GraphSnapshot):
+    g: GraphType = build_graph({"nodes": [{"id": "n1", "kind": "symbol", "state": "pending"}]})
+    cast(Any, snapshot_graph).assert_graph(g)
+
+
+def test_edge_and_events(snapshot_graph: GraphSnapshot):
+    events: list[EventSpec] = [
+        {"type": "addNodes", "nodes": ["n5"]},
+        {"type": "addEdges", "edges": [{"source": "n1", "target": "n2", "kind": "calls"}]},
+        {"type": "updateNode", "id": "n5", "patch": {"state": "resolved", "tokens": 3}},
+        {"type": "iteration", "step": 1},
+    ]
+    g: GraphType = build_graph(
+        {
+            "nodes": [
+                {"id": "n5", "kind": "symbol", "state": "pending"},
+                {"id": "n1", "kind": "symbol", "state": "pending"},
+                {"id": "n2", "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [],
+        }
+    )
+    apply_events(g, events)
+    cast(Any, snapshot_graph).assert_graph(g)
+</file>
+
+<file path=".gitignore">
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+</file>
+
+<file path=".python-version">
+3.14
+</file>
+
+<file path="AGENTS.md">
+# AGENTS.md
+
+## 🧠 Project Overview
+
+This is a deterministic, event-driven graph traversal system.
+
+Key properties:
+
+* deterministic
+* event-driven (RxPY)
+* graph-based (NetworkX)
+* strict models (Pydantic)
+* snapshot tested
+
+---
+
+## ⚙️ Development Environment
+
+This project uses **Nix flakes**.
+
+### Enter dev shell:
+
+nix develop
+
+All tools are available inside the shell.
+
+---
+
+## 🚀 Commands (via uv)
+
+All development commands are executed via uv.
+
+Run commands like:
+
+uv run <command>
+
+---
+
+### Core commands
+
+Run tests:
+
+uv run pytest
+
+Run linting:
+
+uv run ruff check .
+
+Format code:
+
+uv run black .
+
+Type check:
+
+uv run basedpyright
+
+Run full check:
+
+uv run basedpyright && uv run pytest
+
+---
+
+## 🧪 Testing
+
+* Uses pytest
+* Tests must be deterministic
+* Prefer snapshot-style validation where possible
+
+---
+
+## 🧱 Architecture Rules
+
+* Graph is monotonic (never delete)
+* All mutations emit events
+* No randomness or time-based logic
+* Keep implementations simple and explicit
+
+---
+
+## 🚫 Constraints
+
+* Do NOT introduce async
+* Do NOT add external services
+* Do NOT add unnecessary abstractions
+* Do NOT modify flake.nix unless explicitly asked
+
+---
+## Hard Rules
+
+- NEVER run pytest directly
+- NEVER run pyright directly
+- NEVER use pip
+- NEVER use PYTHONPATH hacks
+- NEVER assume system Python has dependencies
+
+## 🧠 Notes for Agents
+
+* Always run `uv run basedpyright && uv run ruff check && uv run pytest` before finalizing changes
+* Assume the Nix environment is required
+* Do not attempt to install dependencies manually
+* Do not use pip or virtualenv
+
+---
+
+## ✅ TL;DR
+
+nix develop
+uv run basedpyright && uv run pytest
+</file>
+
+<file path="flake.lock">
+{
+  "nodes": {
+    "flake-utils": {
+      "inputs": {
+        "systems": "systems"
+      },
+      "locked": {
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1773734432,
+        "narHash": "sha256-IF5ppUWh6gHGHYDbtVUyhwy/i7D261P7fWD1bPefOsw=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "cda48547b432e8d3b18b4180ba07473762ec8558",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "flake-utils": "flake-utils",
+        "nixpkgs": "nixpkgs"
+      }
+    },
+    "systems": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
+</file>
+
+<file path="flake.nix">
+{
+  description = "Iterative-context development environment";
+
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          buildInputs = [
+            pkgs.python3
+            pkgs.uv
+          ];
+        };
+
+      }
+    );
+}
+</file>
+
+<file path="pyproject.toml">
+[project]
+name = "iterative-context"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "networkx>=3.0",
+    "pydantic>=2.0",
+    "rx>=3.0",
+    "pytest>=8.0",
+    "pytest-snapshot>=0.9",
+    "rxpy>=0.1.0",
+    "basedpyright>=1.5.0",
+    "ruff>=0.4.0",
+]
+packages = [{ include = "iterative_context", from = "src" }]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "B",   # bugbear
+    "I",   # import sorting
+    "UP",  # pyupgrade
+    "C4",  # comprehensions
+    "SIM", # simplifications
+    "PL",  # pylint rules
+]
+
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004"]  # allow magic values in tests
+
+[tool.uv.workspace]
+members = [
+    ".",
+]
+
+[tool.uv.sources]
+iterative-context = { workspace = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "iterative-context",
+]
+</file>
+
+<file path="pyrightconfig.json">
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "strict",
+  "include": ["src", "tests"],
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": ["src"]
+    }
+  ]
+}
+</file>
+
+</files>
