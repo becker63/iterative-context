@@ -41,6 +41,14 @@ The content is organized as follows:
 
 <directory_structure>
 notes/
+  tests_and_invariants/
+    metamorphic/
+      concept.md
+      tests_to_impl.md
+      vs_property_testing.md
+    property_based_setup.md
+    property_based_tests.md
+    testing_scoring.md
   development_phases.md
   effort_estimate_and_next_moves.md
   scoring_v1.md
@@ -76,6 +84,1624 @@ README.md
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="notes/tests_and_invariants/metamorphic/tests_to_impl.md">
+Perfect — let’s make this **actionable and high-signal**.
+
+I’ll give you a **curated set of metamorphic tests** tailored to your system, grouped by what they protect. These are not random — they map directly to:
+
+```text
+data layer → control flow → scoring (future)
+```
+
+---
+
+# 🧠 Quick structure
+
+Each test =
+
+```text
+Transformation (T)
+Expected Relation (R)
+Why it matters
+```
+
+---
+
+# 🔹 GROUP 1 — Graph invariance (Phase 1/2 MUST-HAVE)
+
+These protect your **core semantics**.
+
+---
+
+## 1. Irrelevant node invariance ⭐ (start here)
+
+### T
+
+Add a node with no edges
+
+### R
+
+Output graph should be identical
+
+```python
+def test_irrelevant_node_invariance():
+    g1 = base_graph()
+    g2 = base_graph()
+
+    apply_events(g2, [{"type": "addNodes", "nodes": ["noise"]}])
+
+    r1 = run_traversal(g1)
+    r2 = run_traversal(g2)
+
+    assert normalize(r1) == normalize(r2)
+```
+
+### Why
+
+Prevents hidden global coupling / noise sensitivity
+
+---
+
+## 2. Disconnected subgraph invariance
+
+### T
+
+Add an entirely separate subgraph
+
+### R
+
+Traversal result should ignore it
+
+### Why
+
+Ensures locality — traversal only cares about reachable context
+
+---
+
+## 3. Node renaming invariance
+
+### T
+
+Rename all node IDs consistently
+
+### R
+
+Graphs should be isomorphic
+
+```python
+assert isomorphic(r1, r2)
+```
+
+### Why
+
+Prevents ID-based bias (VERY common subtle bug)
+
+---
+
+## 4. Event order invariance (commutative ops)
+
+### T
+
+Reorder independent events
+
+### R
+
+Final graph must be identical
+
+### Why
+
+Ensures deterministic + order-independent semantics
+
+---
+
+# 🔹 GROUP 2 — Event semantics (Phase 1/2)
+
+These validate your **event DSL correctness**.
+
+---
+
+## 5. Duplicate addNodes is a no-op
+
+### T
+
+Apply addNodes twice
+
+### R
+
+Graph unchanged after first application
+
+### Why
+
+Locks idempotency
+
+---
+
+## 6. Iteration event invariance ⭐
+
+### T
+
+Insert/remove iteration events
+
+### R
+
+Graph must be identical
+
+```python
+assert normalize(g_with) == normalize(g_without)
+```
+
+### Why
+
+Ensures iteration is purely observational
+
+---
+
+## 7. Equivalent update merging
+
+### T
+
+Split update into multiple patches vs single patch
+
+```text
+update(state=resolved)
+update(tokens=3)
+```
+
+vs
+
+```text
+update({state=resolved, tokens=3})
+```
+
+### R
+
+Final graph identical
+
+### Why
+
+Ensures update semantics are composable
+
+---
+
+# 🔹 GROUP 3 — Structural symmetry
+
+These test **fairness and consistency**
+
+---
+
+## 8. Duplicate subgraph symmetry
+
+### T
+
+Duplicate part of graph
+
+### R
+
+Both copies behave the same
+
+### Why
+
+Prevents structural bias
+
+---
+
+## 9. Edge direction consistency (if applicable)
+
+### T
+
+Flip edge direction (if semantics allow)
+
+### R
+
+Behavior should change *predictably*, not randomly
+
+### Why
+
+Catches misuse of directionality
+
+---
+
+# 🔹 GROUP 4 — Robustness (LLM / adversarial alignment)
+
+Even though LLM isn’t core, this is VERY relevant.
+
+---
+
+## 10. Noise robustness ⭐
+
+### T
+
+Inject random valid-but-irrelevant events
+
+### R
+
+Graph remains valid + stable
+
+```python
+assert graph_is_valid(result)
+```
+
+### Why
+
+System must tolerate garbage suggestions
+
+---
+
+## 11. Invalid suggestion rejection
+
+### T
+
+Inject invalid edge
+
+### R
+
+Either:
+
+* clean failure OR
+* no corruption
+
+### Why
+
+Locks your validation boundary
+
+---
+
+# 🔹 GROUP 5 — Growth / monotonicity
+
+These protect your **core graph guarantees**
+
+---
+
+## 12. Monotonic node growth
+
+### T
+
+Add events
+
+### R
+
+Nodes never disappear
+
+---
+
+## 13. Monotonic edge growth
+
+### T
+
+Add edges over time
+
+### R
+
+Edges only increase (unless explicitly changed later)
+
+---
+
+# 🔹 GROUP 6 — Phase 3 (SCORING — future but important)
+
+These will become your *most valuable tests*
+
+---
+
+## 14. Irrelevant node does not affect ranking ⭐
+
+### T
+
+Add irrelevant node
+
+### R
+
+Ranking order unchanged
+
+---
+
+## 15. More evidence improves ranking
+
+### T
+
+Increase tokens / evidence
+
+### R
+
+Node rank should not decrease
+
+```python
+assert rank_after >= rank_before
+```
+
+---
+
+## 16. Symmetric nodes rank equally
+
+### T
+
+Create two identical nodes
+
+### R
+
+Scores equal
+
+---
+
+## 17. Small perturbation → small change
+
+### T
+
+Slightly modify graph
+
+### R
+
+Ranking changes minimally
+
+### Why
+
+Prevents unstable scoring
+
+---
+
+## 18. Adding connectivity increases importance
+
+### T
+
+Increase degree of node
+
+### R
+
+Score should increase (given your heuristic)
+
+---
+
+# 🔹 GROUP 7 — Determinism (critical)
+
+---
+
+## 19. Transformation preserves determinism ⭐
+
+### T
+
+Apply transformation (rename, reorder, etc.)
+
+### R
+
+Still deterministic
+
+```python
+f(x) == f(x)
+f(T(x)) == f(T(x))
+```
+
+---
+
+# 🧠 How many should you actually implement?
+
+Don’t do all at once.
+
+---
+
+## Start with these 5:
+
+```text
+1. irrelevant node invariance
+2. iteration invariance
+3. event order invariance
+4. duplicate addNodes idempotency
+5. noise robustness
+```
+
+👉 This already gives you HUGE coverage
+
+---
+
+## Then add:
+
+```text
+6. node renaming invariance
+7. disconnected subgraph invariance
+```
+
+---
+
+## Then (Phase 3):
+
+```text
+8. ranking invariance under noise
+9. evidence improves ranking
+```
+
+---
+
+# 🔥 The deeper structure (important insight)
+
+You’re covering:
+
+| Layer      | What you're testing   |
+| ---------- | --------------------- |
+| Data       | graph invariance      |
+| Events     | DSL correctness       |
+| Control    | determinism, ordering |
+| Robustness | adversarial input     |
+| Scoring    | behavior under signal |
+
+---
+
+# 🧾 Final takeaway
+
+A good metamorphic suite for your system ensures:
+
+```text
+- irrelevant changes don’t affect behavior
+- equivalent inputs produce equivalent outputs
+- meaningful changes produce meaningful effects
+- garbage input doesn’t break the system
+```
+
+---
+
+# 🚀 If you want next
+
+We can:
+
+👉 define a reusable **metamorphic test harness** (so adding these is trivial)
+👉 or implement the **first 3 tests directly in your codebase style** (very fast win)
+</file>
+
+<file path="notes/tests_and_invariants/metamorphic/vs_property_testing.md">
+This is a really good question — and the answer is subtle.
+
+---
+
+# 🧠 Short answer
+
+```text
+Property testing and metamorphic testing are peers, not layers.
+```
+
+* ❌ Metamorphic is NOT “more important”
+* ❌ Metamorphic is NOT “enabled by” property testing
+* ✅ They solve **different correctness gaps**
+
+---
+
+# 🔥 The clean distinction
+
+## Property testing
+
+```text
+Does each output satisfy fundamental laws?
+```
+
+## Metamorphic testing
+
+```text
+Does behavior change correctly when inputs change?
+```
+
+---
+
+# 🧠 Think of it like axes
+
+```
+            INPUT VARIATION
+                 ↑
+                 |
+     Metamorphic |   (relations across runs)
+                 |
+-----------------+----------------→ OUTPUT VALIDITY
+                 |
+     Property    |   (invariants within one run)
+                 |
+```
+
+---
+
+# 🧱 What each one protects (in your system)
+
+## Property tests protect:
+
+```text
+“Nothing illegal ever happens”
+```
+
+Examples:
+
+* no dangling edges
+* iteration does not mutate
+* determinism holds
+
+👉 These are **safety guarantees**
+
+---
+
+## Metamorphic tests protect:
+
+```text
+“The system behaves correctly under change”
+```
+
+Examples:
+
+* adding noise doesn’t affect result
+* renaming nodes doesn’t change structure
+* more evidence improves ranking
+
+👉 These are **behavioral guarantees**
+
+---
+
+# 🔥 Why you need BOTH
+
+Because each one misses things the other catches.
+
+---
+
+## ❌ Property tests miss this
+
+Bug:
+
+```text
+scoring depends on total node count
+```
+
+Add irrelevant node → ranking changes
+
+---
+
+### Property test:
+
+```text
+✔ graph valid
+✔ no invariants violated
+→ passes
+```
+
+---
+
+### Metamorphic test:
+
+```text
+❌ result changed when it shouldn’t
+→ fails
+```
+
+---
+
+## ❌ Metamorphic tests miss this
+
+Bug:
+
+```text
+edge created with missing node
+```
+
+---
+
+### Metamorphic test:
+
+```text
+might still satisfy relation
+→ passes
+```
+
+---
+
+### Property test:
+
+```text
+❌ dangling edge detected
+→ fails
+```
+
+---
+
+# 🧠 So which is “more important”?
+
+## Phase 1–2 (your current stage)
+
+👉 **Property testing is slightly more important**
+
+Because you’re establishing:
+
+```text
+system correctness + safety
+```
+
+---
+
+## Phase 3+ (scoring, heuristics)
+
+👉 **Metamorphic becomes equally or more important**
+
+Because now you care about:
+
+```text
+quality + behavior under change
+```
+
+---
+
+# 🔥 The real progression (this is key)
+
+## Early system (you now)
+
+```text
+Goal: “system doesn’t break”
+→ property tests dominate
+```
+
+---
+
+## Mid system (Phase 3)
+
+```text
+Goal: “system behaves well”
+→ metamorphic tests rise
+```
+
+---
+
+## Mature system
+
+```text
+Goal: “system improves over time”
+→ differential + metamorphic dominate
+```
+
+---
+
+# 🧠 Are metamorphic tests “enabled” by property tests?
+
+No — but they often **use the same machinery**.
+
+---
+
+## Shared infrastructure
+
+Both use:
+
+* Hypothesis (often)
+* random input generation
+* replayable systems
+
+---
+
+## But conceptually different
+
+### Property test:
+
+```python
+@given(x)
+assert invariant(f(x))
+```
+
+---
+
+### Metamorphic test:
+
+```python
+@given(x)
+x2 = transform(x)
+
+assert relation(f(x), f(x2))
+```
+
+---
+
+👉 Same tool (Hypothesis), different idea.
+
+---
+
+# 🔥 Important insight (this is the good part)
+
+Property tests are:
+
+```text
+absolute correctness
+```
+
+Metamorphic tests are:
+
+```text
+relative correctness
+```
+
+---
+
+# 🧠 Why this matters for YOU
+
+Your system is:
+
+```text
+deterministic ✔
+structured ✔
+but heuristic (soon) ✔
+```
+
+---
+
+That means:
+
+* property tests → protect the engine
+* metamorphic tests → validate behavior
+
+---
+
+# ⚡ A very concrete way to think about it
+
+## Property test says:
+
+```text
+“This output is valid”
+```
+
+## Metamorphic test says:
+
+```text
+“This output is consistent with another output”
+```
+
+---
+
+# 🧾 Final answer (clean)
+
+* Metamorphic testing is **not more important** than property testing
+* It is **not enabled by** property testing
+* They are **complementary and orthogonal**
+
+---
+
+## In your project:
+
+```text
+Property tests → guarantee system safety
+Metamorphic tests → guarantee behavioral correctness
+```
+
+---
+
+# 🚀 My recommendation for you
+
+Right now:
+
+```text
+70% property tests
+30% metamorphic tests
+```
+
+Then as you hit scoring:
+
+```text
+50% property
+50% metamorphic
+```
+
+---
+
+If you want next, we can:
+
+👉 design a **single test that combines both** (very powerful pattern)
+👉 or implement your first metamorphic test using your existing DSL + snapshot setup
+</file>
+
+<file path="notes/tests_and_invariants/property_based_setup.md">
+Short answer:
+👉 **Yes — Hypothesis is a very good fit here.**
+But use it *surgically*, not everywhere.
+
+You’re basically building a **deterministic event system with invariants** → that’s exactly where Hypothesis shines.
+
+---
+
+# 🧠 When Hypothesis is worth it (your case)
+
+You have:
+
+```text
+event sequences → mutate graph → produce state
+```
+
+This is:
+
+* combinatorial (lots of possible sequences)
+* stateful
+* easy to accidentally break invariants
+
+👉 That’s *perfect* for property-based testing.
+
+---
+
+# ⚖️ Where Hypothesis fits in your stack
+
+Think of your testing layers like this:
+
+```text
+Layer 1: Snapshot tests
+→ lock known behaviors
+
+Layer 2: Property tests (Hypothesis)
+→ explore unknown behaviors
+
+Layer 3 (later): fixtures / scenarios
+→ meaningful real-world patterns
+```
+
+---
+
+# 🔥 What Hypothesis gives you (specifically)
+
+## 1. Automatic edge case discovery
+
+Instead of you writing:
+
+```python
+events = [...]
+```
+
+Hypothesis generates:
+
+```text
+[], [iteration], [updateNode before add], weird combos...
+```
+
+👉 including cases you wouldn’t think of
+
+---
+
+## 2. Shrinking (this is the killer feature)
+
+When something fails:
+
+```text
+100 events → failure
+```
+
+Hypothesis reduces it to:
+
+```text
+2 events → minimal failure case
+```
+
+👉 This is *insanely valuable* for debugging your system
+
+---
+
+## 3. Real invariant enforcement
+
+You stop testing:
+
+```text
+specific cases
+```
+
+And start testing:
+
+```text
+“this can NEVER happen”
+```
+
+---
+
+# 🧱 How to integrate it cleanly (minimal setup)
+
+## Install
+
+In your Nix/uv world:
+
+```bash
+uv add hypothesis
+```
+
+(or add to pyproject)
+
+---
+
+# 🧪 Step 1 — Define event strategies
+
+This is the key piece.
+
+Start **simple** (don’t over-engineer yet).
+
+```python
+from hypothesis import strategies as st
+
+node_ids = st.sampled_from(["n1", "n2", "n3", "n4"])
+
+add_nodes = st.builds(
+    lambda ids: {"type": "addNodes", "nodes": ids},
+    st.lists(node_ids, min_size=1, max_size=3),
+)
+
+add_edges = st.builds(
+    lambda s, t: {
+        "type": "addEdges",
+        "edges": [{"source": s, "target": t, "kind": "calls"}],
+    },
+    node_ids,
+    node_ids,
+)
+
+update_node = st.builds(
+    lambda nid: {
+        "type": "updateNode",
+        "id": nid,
+        "patch": {"state": "resolved", "tokens": 1},
+    },
+    node_ids,
+)
+
+iteration = st.builds(
+    lambda step: {"type": "iteration", "step": step},
+    st.integers(min_value=0, max_value=10),
+)
+
+event_strategy = st.one_of(add_nodes, add_edges, update_node, iteration)
+
+event_sequences = st.lists(event_strategy, min_size=0, max_size=10)
+```
+
+---
+
+# 🧪 Step 2 — Write your first property test
+
+## 🔥 Determinism (most important)
+
+```python
+from hypothesis import given
+
+@given(event_sequences)
+def test_deterministic(events):
+    g1 = build_graph(initial_graph())
+    g2 = build_graph(initial_graph())
+
+    out1 = replay_with_event_snapshots(g1, events)
+    out2 = replay_with_event_snapshots(g2, events)
+
+    assert normalize(out1) == normalize(out2)
+```
+
+👉 If this fails, your whole system is suspect.
+
+---
+
+## 🔥 Iteration is pure
+
+```python
+@given(event_sequences)
+def test_iteration_does_not_mutate(events):
+    g = build_graph(initial_graph())
+
+    before = normalize_graph(g)
+
+    apply_events(g, [{"type": "iteration", "step": 1}])
+
+    after = normalize_graph(g)
+
+    assert before == after
+```
+
+---
+
+## 🔥 Idempotent addNodes
+
+```python
+@given(node_ids)
+def test_add_nodes_idempotent(node_id):
+    g = build_graph(initial_graph())
+
+    apply_events(g, [{"type": "addNodes", "nodes": [node_id]}])
+    state1 = normalize_graph(g)
+
+    apply_events(g, [{"type": "addNodes", "nodes": [node_id]}])
+    state2 = normalize_graph(g)
+
+    assert state1 == state2
+```
+
+---
+
+# ⚠️ Important constraints (VERY important)
+
+## 1. Keep strategies SMALL at first
+
+Bad:
+
+```python
+max_size=100
+```
+
+Good:
+
+```python
+max_size=10
+```
+
+👉 You want signal, not chaos.
+
+---
+
+## 2. Avoid invalid cases (at first)
+
+Right now your system raises:
+
+```text
+edge references unknown node → ValueError
+```
+
+You have two options:
+
+### Option A (recommended initially)
+
+Allow failures:
+
+```python
+try:
+    apply_events(...)
+except ValueError:
+    return
+```
+
+---
+
+### Option B (later)
+
+Make strategies smarter (only valid graphs)
+
+---
+
+## 3. Normalize everything before compare
+
+Always:
+
+```python
+normalize_graph(...)
+```
+
+Otherwise you’ll get false failures.
+
+---
+
+# 🔥 Where Hypothesis will shine later (Phase 3+)
+
+This is where it gets *really* interesting:
+
+---
+
+## Scoring invariants
+
+```text
+higher score → selected first
+```
+
+---
+
+## No infinite loops
+
+```text
+system must terminate within N steps
+```
+
+---
+
+## Expansion correctness
+
+```text
+expansion only adds valid nodes
+```
+
+---
+
+👉 This becomes **structured fuzzing of your traversal engine**
+
+---
+
+# 🧠 Honest take (for you specifically)
+
+Given how you think (systems / fuzzing / invariants):
+
+👉 Hypothesis will feel *very natural* to you
+
+It’s basically:
+
+```text
+property testing = principled fuzzing
+```
+
+---
+
+# 🚀 My recommendation (very concrete)
+
+Do this:
+
+### ✅ Add Hypothesis
+
+### ✅ Implement ONLY these 3 tests:
+
+1. determinism
+2. iteration purity
+3. addNodes idempotency
+
+---
+
+### ❌ Do NOT:
+
+* try to fully model valid graphs yet
+* generate perfect event sequences
+* overcomplicate strategies
+
+---
+
+# 🧾 Final answer
+
+👉 Yes — you should use Hypothesis
+👉 It’s a perfect fit for your system
+
+But:
+
+```text
+use it to protect invariants
+not to replace snapshots
+```
+
+---
+
+If you want next, I can:
+
+👉 design a **stateful Hypothesis model** (this would be extremely powerful for your system)
+👉 or help you build a **minimal but correct event generator** that won’t fight you during debugging
+</file>
+
+<file path="notes/tests_and_invariants/testing_scoring.md">
+Perfect — this is where Hypothesis stops being “nice to have” and becomes **core to your system design**.
+
+You’re moving from:
+
+```text
+“does this example work?”
+```
+
+to:
+
+```text
+“can this system ever violate its laws?”
+```
+
+Let’s go deep on each of the three you called out.
+
+---
+
+# 🧠 1. Scoring invariant
+
+### “higher score → selected first”
+
+---
+
+## 🔥 What you’re actually asserting
+
+Not:
+
+```text
+“this node has score 10”
+```
+
+But:
+
+```text
+selection(node_set) == argmax(score(node))
+```
+
+---
+
+## 🧪 Property to test
+
+For ANY graph + ANY scores:
+
+```text
+the selected node must be the highest scoring candidate
+```
+
+---
+
+## 🧱 Minimal version (pure function style)
+
+Assume you have:
+
+```python
+def select_next(nodes, graph, step):
+    ...
+```
+
+---
+
+### Property test
+
+```python
+from hypothesis import given
+import hypothesis.strategies as st
+
+@given(st.lists(st.integers(min_value=0, max_value=100), min_size=1, max_size=10))
+def test_selects_highest_score(scores):
+    # Build fake nodes with scores
+    nodes = [
+        {"id": f"n{i}", "score": s, "expanded": False}
+        for i, s in enumerate(scores)
+    ]
+
+    # Define scoring function
+    def score_fn(node):
+        return node["score"]
+
+    selected = max(nodes, key=score_fn)  # expected behavior
+    actual = select_next(nodes, score_fn)
+
+    assert actual == selected
+```
+
+---
+
+## 🧠 Why this matters
+
+Later when you add:
+
+* tie-breaking
+* recency penalties
+* graph-dependent scoring
+
+👉 this invariant ensures:
+
+```text
+your selection logic never drifts from your scoring logic
+```
+
+---
+
+## 🔥 More advanced version (your real system)
+
+You’ll eventually test:
+
+```text
+score_node(node, graph, step)
+```
+
+Property:
+
+```text
+selected_node.score >= all other candidate scores
+```
+
+---
+
+# 🧠 2. No infinite loops
+
+### “system must terminate within N steps”
+
+---
+
+## 🔥 What you’re asserting
+
+Your traversal loop:
+
+```text
+must not get stuck expanding forever
+```
+
+---
+
+## 🧪 Property to test
+
+For ANY valid starting graph:
+
+```text
+run_traversal(...) → completes within max_steps
+```
+
+---
+
+## 🧱 Example
+
+```python
+@given(event_sequences)
+def test_traversal_terminates(events):
+    g = build_graph(initial_graph())
+
+    max_steps = 20
+
+    steps = run_traversal(g, events, max_steps=max_steps)
+
+    assert len(steps) <= max_steps
+```
+
+---
+
+## 🧠 Better version (stronger)
+
+Track:
+
+```text
+number of expansions
+```
+
+Property:
+
+```text
+each step must make progress OR stop
+```
+
+---
+
+### Example
+
+```python
+@given(event_sequences)
+def test_no_stalling(events):
+    g = build_graph(initial_graph())
+
+    steps = run_traversal(g, events, max_steps=50)
+
+    # no repeated identical states
+    seen = set()
+
+    for step in steps:
+        state = normalize_graph(step["graph"])
+        assert state not in seen
+        seen.add(state)
+```
+
+---
+
+## 🔥 Why this matters
+
+Without this:
+
+* scoring bug → expands same node forever
+* recency bug → oscillation loop
+* expansion bug → infinite growth
+
+👉 This catches those *automatically*
+
+---
+
+# 🧠 3. Expansion correctness
+
+### “expansion only adds valid nodes”
+
+---
+
+## 🔥 What you’re asserting
+
+Expansion must:
+
+```text
+only introduce valid graph structure
+```
+
+---
+
+## 🧪 Core properties
+
+### ✅ Property 1 — no dangling edges
+
+```text
+every edge must connect existing nodes
+```
+
+```python
+@given(event_sequences)
+def test_no_dangling_edges(events):
+    g = build_graph(initial_graph())
+
+    try:
+        apply_events(g, events)
+    except ValueError:
+        return
+
+    for u, v in g.edges:
+        assert u in g.nodes
+        assert v in g.nodes
+```
+
+---
+
+### ✅ Property 2 — node schema validity
+
+```text
+all nodes must conform to allowed states/types
+```
+
+```python
+@given(event_sequences)
+def test_node_states_valid(events):
+    g = build_graph(initial_graph())
+
+    try:
+        apply_events(g, events)
+    except ValueError:
+        return
+
+    for _, data in g.nodes(data=True):
+        assert data["state"] in {"pending", "resolved", "anchor", "pruned"}
+```
+
+---
+
+### ✅ Property 3 — expansion is monotonic
+
+```text
+nodes are never removed
+```
+
+```python
+@given(event_sequences)
+def test_monotonic_nodes(events):
+    g = build_graph(initial_graph())
+
+    initial = set(g.nodes)
+
+    try:
+        apply_events(g, events)
+    except ValueError:
+        return
+
+    assert initial.issubset(set(g.nodes))
+```
+
+---
+
+# 🔥 The deeper pattern (this is the important part)
+
+All three of your examples follow the same structure:
+
+---
+
+## 🧠 Property test template
+
+```python
+@given(random_inputs)
+def test_property(inputs):
+    system = initialize()
+
+    result = run(system, inputs)
+
+    assert invariant(result)
+```
+
+---
+
+## Where:
+
+### `inputs`
+
+* random event sequences
+* random graphs
+* random scores
+
+---
+
+### `invariant`
+
+* must ALWAYS hold
+* independent of specific scenario
+
+---
+
+# 🧠 Why this is powerful for YOU
+
+You are building:
+
+```text
+a deterministic exploration engine
+```
+
+That means:
+
+* small bugs → huge behavioral drift
+* edge cases → hard to anticipate
+
+---
+
+Property testing gives you:
+
+```text
+automatic adversarial input generation
+```
+
+---
+
+# ⚡ How this evolves later (important)
+
+Right now: simple invariants
+
+Later (Phase 3+):
+
+---
+
+## 🔥 Scoring consistency
+
+```text
+if A.score > B.score → A selected before B
+```
+
+---
+
+## 🔥 Frontier correctness
+
+```text
+only unexpanded nodes are candidates
+```
+
+---
+
+## 🔥 Bounded growth
+
+```text
+graph size <= limit
+```
+
+---
+
+## 🔥 No duplicate expansions
+
+```text
+node expanded at most once
+```
+
+---
+
+👉 This becomes:
+
+```text
+a full correctness harness for your traversal engine
+```
+
+---
+
+# 🧾 Final mental model
+
+Snapshot tests:
+
+```text
+“this behavior is correct”
+```
+
+Property tests:
+
+```text
+“this behavior can never be incorrect”
+```
+
+---
+
+# 🚀 My recommendation (very concrete)
+
+Implement these first:
+
+---
+
+### 1. Scoring selection correctness
+
+* ensures your “decision layer” is sound
+
+### 2. No infinite loops / progress
+
+* ensures your “control flow” is safe
+
+### 3. Expansion validity
+
+* ensures your “data layer” is valid
+
+---
+
+That gives you coverage across:
+
+```text
+decision + control + data
+```
+
+---
+
+If you want next, I can:
+
+👉 turn your current DSL into a **Hypothesis state machine** (this is the “real power” version)
+👉 or design a **minimal traversal loop** so you can start testing scoring + expansion together
+</file>
 
 <file path="notes/development_phases.md">
 # Development Phases
@@ -1152,36 +2778,6 @@ If you want next, I can:
 But this plan is solid and ready to execute.
 </file>
 
-<file path="src/iterative_context/test_helpers/__init__.py">
-"""Testing helpers for graph DSL construction and snapshot assertions."""
-
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false
-
-from .graph_dsl import (
-    EventSpec,
-    GraphSpec,
-    GraphType,
-    apply_events,
-    build_graph,
-    replay_with_event_snapshots,
-    replay_with_snapshots,
-)
-from .snapshot_graph import GraphSnapshot, normalize_graph, render_steps
-
-__all__ = [
-    "EventSpec",
-    "GraphSpec",
-    "GraphType",
-    "apply_events",
-    "build_graph",
-    "replay_with_event_snapshots",
-    "replay_with_snapshots",
-    "GraphSnapshot",
-    "normalize_graph",
-    "render_steps",
-]
-</file>
-
 <file path="src/iterative_context/test_helpers/graph_dsl.py">
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false
 """Deterministic, declarative helpers for building and mutating graphs in tests."""
@@ -1346,174 +2942,6 @@ __all__ = [
     "GraphSpec",
     "EventSpec",
     "GraphType",
-]
-</file>
-
-<file path="src/iterative_context/test_helpers/snapshot_graph.py">
-# pyright: reportMissingTypeStubs=false
-import json
-from types import SimpleNamespace
-from typing import Any
-
-from pytest_snapshot.plugin import Snapshot
-
-from iterative_context.graph_models import (
-    AddEdgesEvent,
-    AddNodesEvent,
-    Graph,
-    GraphEdge,
-    GraphEvent,
-    GraphNode,
-    UpdateNodeEvent,
-)
-
-
-def _remove_none(d: dict[str, Any]) -> dict[str, Any]:
-    """Return a shallow copy of *d* without keys whose values are ``None``."""
-    return {k: v for k, v in d.items() if v is not None}
-
-
-def normalize_node(node: GraphNode) -> dict[str, Any]:
-    """Explicitly construct a deterministic snapshot for a GraphNode."""
-    out: dict[str, Any] = {
-        "id": node.id,
-        "kind": node.kind,
-        "state": node.state,
-    }
-    tokens = getattr(node, "tokens", None)
-    if tokens is not None:
-        out["tokens"] = tokens
-    evidence = getattr(node, "evidence", None)
-    if evidence is not None:
-        out["evidence"] = {
-            "snippet": evidence.snippet,
-            **({"file": evidence.file} if evidence.file is not None else {}),
-            **({"startLine": evidence.startLine} if evidence.startLine is not None else {}),
-        }
-    return out
-
-
-def normalize_edge(edge: GraphEdge) -> dict[str, Any]:
-    """Explicitly construct a deterministic snapshot for a GraphEdge."""
-    out: dict[str, Any] = {
-        "source": edge.source,
-        "target": edge.target,
-        "kind": edge.kind,
-    }
-    if hasattr(edge, "primary") and edge.primary is not None:
-        out["primary"] = edge.primary
-    return out
-
-
-def normalize_graph(graph: Any) -> dict[str, list[dict[str, Any]]]:
-    """Normalize a NetworkX DiGraph into a deterministic structure."""
-    nodes: list[dict[str, Any]] = []
-    for _, data in graph.nodes(data=True):
-        if isinstance(data, dict):
-            # Ensure required fields exist
-            for k in ("id", "kind", "state"):
-                if k not in data:
-                    raise ValueError(f"Node missing required field '{k}'")
-            tmp = SimpleNamespace(**data)
-            normalized = normalize_node(tmp)  # type: ignore[arg-type]
-        else:
-            normalized = normalize_node(data)  # type: ignore[arg-type]
-        nodes.append(normalized)
-
-    edges: list[dict[str, Any]] = []
-    for source, target, data in graph.edges(data=True):
-        if isinstance(data, dict):
-            # Merge source and target into the temporary namespace.
-            tmp = SimpleNamespace(source=source, target=target, **data)
-            edge_dict = normalize_edge(tmp)  # type: ignore[arg-type]
-        else:
-            edge_dict = normalize_edge(data)
-        edges.append(_remove_none(edge_dict))
-
-    nodes.sort(key=lambda n: n["id"])
-    edges.sort(key=lambda e: (e["source"], e["target"], e["kind"]))
-    return {"nodes": nodes, "edges": edges}
-
-
-def render_steps(steps: list[dict[str, Any]]) -> str:
-    """Serialize a list of steps (event + graph) for snapshot testing."""
-    rendered_steps = json.dumps(
-        [
-            {
-                "event": step["event"],
-                "graph": normalize_graph(step["graph"]),  # type: ignore[arg-type]
-            }
-            for step in steps
-        ],
-        sort_keys=True,
-        indent=2,
-    )
-    return rendered_steps
-
-
-def normalize_event(event: GraphEvent) -> dict[str, Any]:
-    """Normalize a ``GraphEvent`` into a concise, deterministic dict."""
-    if isinstance(event, AddNodesEvent):
-        return {
-            "type": "addNodes",
-            "nodes": sorted([node.id for node in event.nodes]),
-        }
-
-    if isinstance(event, AddEdgesEvent):
-        edges = [{"source": e.source, "target": e.target, "kind": e.kind} for e in event.edges]
-        edges.sort(key=lambda d: (d["source"], d["target"], d["kind"]))
-        return {"type": "addEdges", "edges": edges}
-
-    if isinstance(event, UpdateNodeEvent):
-        patch = _remove_none(event.patch)
-        return {"type": "updateNode", "id": event.id, "patch": patch}
-
-    return {"type": "iteration", "step": event.step}
-
-
-class GraphSnapshot:
-    """Wrapper around the ``snapshot`` fixture providing domain‑aware assertions."""
-
-    def __init__(self, snapshot: Snapshot) -> None:  # type: ignore[assignment]
-        self._snapshot = snapshot
-        self._counter = 0
-
-    def _next_name(self, prefix: str, identifier: str | None = None) -> str:
-        """Generate a deterministic snapshot name."""
-        if prefix in ("node", "edge", "events"):
-            self._counter += 1
-            return f"{prefix}_{self._counter}"
-        if prefix == "graph":
-            return "graph"
-        self._counter += 1
-        return f"{prefix}_{self._counter}"
-
-    def _assert(self, data: Any, name: str) -> None:
-        """Serialize *data* deterministically and forward to the underlying fixture."""
-        rendered = json.dumps(data, sort_keys=True, indent=2)
-        self._snapshot.assert_match(rendered, name)
-
-    def assert_graph(self, graph: Graph) -> None:  # type: ignore[arg-type]
-        self._assert(normalize_graph(graph), self._next_name("graph"))
-
-    def assert_events(self, events: list[GraphEvent]) -> None:  # type: ignore[arg-type]
-        normalized = [normalize_event(ev) for ev in events]
-        self._assert(normalized, self._next_name("events"))
-
-    def assert_node(self, node: GraphNode) -> None:  # type: ignore[arg-type]
-        self._assert(normalize_node(node), self._next_name("node", node.id))
-
-    def assert_edge(self, edge: GraphEdge) -> None:  # type: ignore[arg-type]
-        self._assert(normalize_edge(edge), self._next_name("edge", f"{edge.source}_{edge.target}"))
-
-
-__all__ = [
-    "normalize_node",
-    "normalize_edge",
-    "normalize_graph",
-    "render_steps",
-    "normalize_event",
-    "GraphSnapshot",
 ]
 </file>
 
@@ -2310,6 +3738,204 @@ dev = [
     }
   ]
 }
+</file>
+
+<file path="src/iterative_context/test_helpers/__init__.py">
+"""Testing helpers for graph DSL construction and snapshot assertions."""
+
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false
+
+from .graph_dsl import (
+    EventSpec,
+    GraphSpec,
+    GraphType,
+    apply_events,
+    build_graph,
+    replay_with_event_snapshots,
+    replay_with_snapshots,
+)
+from .snapshot_graph import GraphSnapshot, normalize_graph, render_steps
+
+__all__ = [
+    "EventSpec",
+    "GraphSpec",
+    "GraphType",
+    "apply_events",
+    "build_graph",
+    "replay_with_event_snapshots",
+    "replay_with_snapshots",
+    "GraphSnapshot",
+    "normalize_graph",
+    "render_steps",
+]
+</file>
+
+<file path="src/iterative_context/test_helpers/snapshot_graph.py">
+# pyright: reportMissingTypeStubs=false
+import json
+from types import SimpleNamespace
+from typing import Any
+
+from pytest_snapshot.plugin import Snapshot
+
+from iterative_context.graph_models import (
+    AddEdgesEvent,
+    AddNodesEvent,
+    Graph,
+    GraphEdge,
+    GraphEvent,
+    GraphNode,
+    UpdateNodeEvent,
+)
+
+
+def _remove_none(d: dict[str, Any]) -> dict[str, Any]:
+    """Return a shallow copy of *d* without keys whose values are ``None``."""
+    return {k: v for k, v in d.items() if v is not None}
+
+
+def normalize_node(node: GraphNode) -> dict[str, Any]:
+    """Explicitly construct a deterministic snapshot for a GraphNode."""
+    out: dict[str, Any] = {
+        "id": node.id,
+        "kind": node.kind,
+        "state": node.state,
+    }
+    tokens = getattr(node, "tokens", None)
+    if tokens is not None:
+        out["tokens"] = tokens
+    evidence = getattr(node, "evidence", None)
+    if evidence is not None:
+        out["evidence"] = {
+            "snippet": evidence.snippet,
+            **({"file": evidence.file} if evidence.file is not None else {}),
+            **({"startLine": evidence.startLine} if evidence.startLine is not None else {}),
+        }
+    return out
+
+
+def normalize_edge(edge: GraphEdge) -> dict[str, Any]:
+    """Explicitly construct a deterministic snapshot for a GraphEdge."""
+    out: dict[str, Any] = {
+        "source": edge.source,
+        "target": edge.target,
+        "kind": edge.kind,
+    }
+    if hasattr(edge, "primary") and edge.primary is not None:
+        out["primary"] = edge.primary
+    return out
+
+
+def normalize_graph(graph: Any) -> dict[str, list[dict[str, Any]]]:
+    """Normalize a NetworkX DiGraph into a deterministic structure."""
+    nodes: list[dict[str, Any]] = []
+    for _, data in graph.nodes(data=True):
+        if isinstance(data, dict):
+            # Ensure required fields exist
+            for k in ("id", "kind", "state"):
+                if k not in data:
+                    raise ValueError(f"Node missing required field '{k}'")
+            tmp = SimpleNamespace(**data)
+            normalized = normalize_node(tmp)  # type: ignore[arg-type]
+        else:
+            normalized = normalize_node(data)  # type: ignore[arg-type]
+        nodes.append(normalized)
+
+    edges: list[dict[str, Any]] = []
+    for source, target, data in graph.edges(data=True):
+        if isinstance(data, dict):
+            # Merge source and target into the temporary namespace.
+            tmp = SimpleNamespace(source=source, target=target, **data)
+            edge_dict = normalize_edge(tmp)  # type: ignore[arg-type]
+        else:
+            edge_dict = normalize_edge(data)
+        edges.append(_remove_none(edge_dict))
+
+    nodes.sort(key=lambda n: n["id"])
+    edges.sort(key=lambda e: (e["source"], e["target"], e["kind"]))
+    return {"nodes": nodes, "edges": edges}
+
+
+def render_steps(steps: list[dict[str, Any]]) -> str:
+    """Serialize a list of steps (event + graph) for snapshot testing."""
+    rendered_steps = json.dumps(
+        [
+            {
+                "event": step["event"],
+                "graph": normalize_graph(step["graph"]),  # type: ignore[arg-type]
+            }
+            for step in steps
+        ],
+        sort_keys=True,
+        indent=2,
+    )
+    return rendered_steps
+
+
+def normalize_event(event: GraphEvent) -> dict[str, Any]:
+    """Normalize a ``GraphEvent`` into a concise, deterministic dict."""
+    if isinstance(event, AddNodesEvent):
+        return {
+            "type": "addNodes",
+            "nodes": sorted([node.id for node in event.nodes]),
+        }
+
+    if isinstance(event, AddEdgesEvent):
+        edges = [{"source": e.source, "target": e.target, "kind": e.kind} for e in event.edges]
+        edges.sort(key=lambda d: (d["source"], d["target"], d["kind"]))
+        return {"type": "addEdges", "edges": edges}
+
+    if isinstance(event, UpdateNodeEvent):
+        patch = _remove_none(event.patch)
+        return {"type": "updateNode", "id": event.id, "patch": patch}
+
+    return {"type": "iteration", "step": event.step}
+
+
+class GraphSnapshot:
+    """Wrapper around the ``snapshot`` fixture providing domain‑aware assertions."""
+
+    def __init__(self, snapshot: Snapshot) -> None:  # type: ignore[assignment]
+        self._snapshot = snapshot
+        self._counter = 0
+
+    def _next_name(self, prefix: str, identifier: str | None = None) -> str:
+        """Generate a deterministic snapshot name."""
+        if prefix in ("node", "edge", "events"):
+            self._counter += 1
+            return f"{prefix}_{self._counter}"
+        if prefix == "graph":
+            return "graph"
+        self._counter += 1
+        return f"{prefix}_{self._counter}"
+
+    def _assert(self, data: Any, name: str) -> None:
+        """Serialize *data* deterministically and forward to the underlying fixture."""
+        rendered = json.dumps(data, sort_keys=True, indent=2)
+        self._snapshot.assert_match(rendered, name)
+
+    def assert_graph(self, graph: Graph) -> None:  # type: ignore[arg-type]
+        self._assert(normalize_graph(graph), self._next_name("graph"))
+
+    def assert_events(self, events: list[GraphEvent]) -> None:  # type: ignore[arg-type]
+        normalized = [normalize_event(ev) for ev in events]
+        self._assert(normalized, self._next_name("events"))
+
+    def assert_node(self, node: GraphNode) -> None:  # type: ignore[arg-type]
+        self._assert(normalize_node(node), self._next_name("node", node.id))
+
+    def assert_edge(self, edge: GraphEdge) -> None:  # type: ignore[arg-type]
+        self._assert(normalize_edge(edge), self._next_name("edge", f"{edge.source}_{edge.target}"))
+
+
+__all__ = [
+    "normalize_node",
+    "normalize_edge",
+    "normalize_graph",
+    "render_steps",
+    "normalize_event",
+    "GraphSnapshot",
+]
 </file>
 
 <file path="tests/conftest.py">
