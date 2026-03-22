@@ -6,15 +6,32 @@ from hypothesis import strategies as st
 
 from iterative_context.expansion import expand_node  # type: ignore
 
-node_ids: st.SearchStrategy[str] = st.text(min_size=1, max_size=5)
-existing_nodes: st.SearchStrategy[list[str]] = st.lists(node_ids, unique=True, max_size=5)
+# 🔧 knobs
+MAX_NODE_ID_SIZE = 5
+MAX_NODES = 5
+
+
+# strategies
+node_ids: st.SearchStrategy[str] = st.text(
+    min_size=1,
+    max_size=MAX_NODE_ID_SIZE,
+)
+
+existing_nodes: st.SearchStrategy[list[str]] = st.lists(
+    node_ids,
+    unique=True,
+    max_size=MAX_NODES,
+)
 
 
 def _make_node(nid: str) -> dict[str, str]:
     return {"id": nid, "state": "pending"}
 
 
-node_strategy: st.SearchStrategy[dict[str, str]] = st.builds(_make_node, node_ids)
+node_strategy: st.SearchStrategy[dict[str, str]] = st.builds(
+    _make_node,
+    node_ids,
+)
 
 
 @given(node_strategy, existing_nodes)
@@ -100,12 +117,7 @@ def test_single_child(node_id: str):
 
     events: list[Any] = expand_node(node, [node_id])
 
-    created: list[str] = [
-        n.id
-        for e in events
-        if e.type == "addNodes"
-        for n in e.nodes
-    ]
+    created: list[str] = [n.id for e in events if e.type == "addNodes" for n in e.nodes]
 
     assert len(created) <= 1
 

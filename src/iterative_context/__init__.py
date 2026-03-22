@@ -16,6 +16,14 @@ from .graph_models import (  # noqa: F401
     UpdateNodeEvent,
     create_event_subject,
 )
+from .traversal import (  # noqa: F401
+    DefaultExpansionPolicy,
+    ExpansionPolicy,
+    get_frontier,
+    run_traversal,
+    score_node,
+    select_next_node,
+)
 
 __all__ = [
     "GraphNode",
@@ -32,4 +40,10 @@ __all__ = [
     "AnchorNode",
     "ResolvedNode",
     "Evidence",
+    "get_frontier",
+    "score_node",
+    "select_next_node",
+    "ExpansionPolicy",
+    "DefaultExpansionPolicy",
+    "run_traversal",
 ]
