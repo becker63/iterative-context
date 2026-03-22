@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Protocol, cast
 
 from iterative_context.expansion import expand_node
 from iterative_context.graph_models import Graph, GraphEvent, GraphNode
 from iterative_context.test_helpers.graph_dsl import apply_events
+
+ScoreFn = Callable[[GraphNode, Graph, int], float]
 
 
 def get_frontier(graph: Graph) -> list[GraphNode]:
@@ -39,12 +41,12 @@ def score_node(node: GraphNode, graph: Graph, step: int) -> float:
     return score
 
 
-def select_next_node(graph: Graph, step: int) -> GraphNode:
+def select_next_node(graph: Graph, step: int, score_fn: ScoreFn) -> GraphNode:
     """Select the best node to expand."""
     frontier = get_frontier(graph)
     if not frontier:
         raise ValueError("No pending nodes available for selection")
-    return max(frontier, key=lambda n: (score_node(n, graph, step), n.id))
+    return max(frontier, key=lambda n: (score_fn(n, graph, step), n.id))
 
 
 class ExpansionPolicy(Protocol):
@@ -60,13 +62,15 @@ class DefaultExpansionPolicy:
         )
 
 
-def run_traversal(graph: Graph, steps: int, expansion_policy: ExpansionPolicy) -> Graph:
+def run_traversal(
+    graph: Graph, steps: int, expansion_policy: ExpansionPolicy, score_fn: ScoreFn
+) -> Graph:
     """Run N expansion steps."""
     for step in range(steps):
         frontier = get_frontier(graph)
         if not frontier:
             break
-        node = select_next_node(graph, step)
+        node = select_next_node(graph, step, score_fn)
         events = expansion_policy.expand(node, graph)
         apply_events(graph, events)
     return graph
@@ -75,6 +79,7 @@ def run_traversal(graph: Graph, steps: int, expansion_policy: ExpansionPolicy) -
 __all__ = [
     "get_frontier",
     "score_node",
+    "ScoreFn",
     "select_next_node",
     "ExpansionPolicy",
     "DefaultExpansionPolicy",

@@ -45,7 +45,9 @@ The content is organized as follows:
     13b75172fffe16dc
     3e760b36791142ee
     4acb6b6a49aa6a45
+    4b3f3fce4bc17216
     58d3fceec14484db
+    85d613f1ebc3ccc9
     a3db2a2929b77630
     e6be1952a79f71bb
     ed75a52dd5586707
@@ -88,6 +90,7 @@ src/
     __init__.py
     expansion.py
     graph_models.py
+    traversal.py
 tests/
   snapshots/
     test_expansion/
@@ -102,12 +105,16 @@ tests/
         graph_steps
       test_node_variants/
         graph
+    test_traversal_selection/
+      test_traversal_changes_with_scoring/
+        graph
   conftest.py
   test_expansion_metamorphic.py
   test_expansion_properties.py
   test_expansion.py
   test_graph_invariants.py
   test_graph_models.py
+  test_traversal_selection.py
 .gitignore
 .python-version
 AGENTS.md
@@ -120,188 +127,6 @@ README.md
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="tests/test_graph_invariants.py">
-# pyright: reportMissingTypeStubs=false
-from __future__ import annotations
-
-from typing import cast
-
-from hypothesis import given
-from hypothesis import strategies as st
-
-from iterative_context.expansion import expand_node  # type: ignore
-from iterative_context.test_helpers import (
-    EventSpec,
-    GraphSpec,
-    GraphType,
-    apply_events,
-    build_graph,
-    normalize_graph,
-)
-
-
-def assert_graph_valid(graph: GraphType) -> None:
-    allowed_states = {"pending", "resolved", "anchor", "pruned"}
-    normalized = normalize_graph(graph)
-
-    node_ids: list[str] = []
-    for node in normalized["nodes"]:
-        node_id = node["id"]
-        assert node_id not in node_ids
-        node_ids.append(node_id)
-        assert node["state"] in allowed_states
-
-    nodes_seen = set(node_ids)
-
-    edges_seen: set[tuple[str, str, str]] = set()
-    for edge in normalized["edges"]:
-        key = (edge["source"], edge["target"], edge["kind"])
-        assert key not in edges_seen
-        edges_seen.add(key)
-
-        assert edge["source"] in nodes_seen
-        assert edge["target"] in nodes_seen
-
-
-node_ids: st.SearchStrategy[str] = st.text(min_size=1, max_size=3)
-
-
-def make_edge_spec(s: str, t: str, k: str) -> dict[str, str]:
-    return {"source": s, "target": t, "kind": k}
-
-
-def make_add_nodes(ns: list[str]) -> EventSpec:
-    return cast(EventSpec, {"type": "addNodes", "nodes": ns})
-
-
-def make_add_edges(edges: list[dict[str, str]]) -> EventSpec:
-    return cast(EventSpec, {"type": "addEdges", "edges": edges})
-
-
-def make_update_node(nid: str) -> EventSpec:
-    return cast(
-        EventSpec,
-        {"type": "updateNode", "id": nid, "patch": {"state": "resolved", "tokens": 1}},
-    )
-
-
-edge_spec_strategy: st.SearchStrategy[dict[str, str]] = st.builds(
-    make_edge_spec,
-    node_ids,
-    node_ids,
-    st.sampled_from(["calls", "imports", "references"]),
-)
-event_strategy: st.SearchStrategy[EventSpec] = st.one_of(
-    st.builds(
-        make_add_nodes,
-        st.lists(node_ids, min_size=1, max_size=3, unique=True),
-    ),
-    st.builds(
-        make_add_edges,
-        st.lists(edge_spec_strategy, min_size=1, max_size=3),
-    ),
-    st.builds(
-        make_update_node,
-        node_ids,
-    ),
-    st.just(cast(EventSpec, {"type": "iteration", "step": 0})),
-)
-event_sequences: st.SearchStrategy[list[EventSpec]] = st.lists(event_strategy, max_size=6)
-
-
-@given(event_sequences)
-def test_graph_always_valid(events: list[EventSpec]) -> None:
-    base_spec: GraphSpec = {"nodes": [], "edges": []}
-    graph = build_graph(base_spec)
-    for event in events:
-        try:
-            apply_events(graph, [event])
-        except ValueError:
-            break
-    assert_graph_valid(graph)
-
-
-def test_expand_node_deterministic() -> None:
-    node = {"id": "A", "state": "pending"}
-    existing = ["A"]
-    events1 = expand_node(node, existing)  # type: ignore[arg-type]
-    events2 = expand_node(node, existing)  # type: ignore[arg-type]
-    assert events1 == events2
-
-
-def test_expand_node_minimal_when_child_exists() -> None:
-    node = {"id": "A", "state": "pending"}
-    existing = ["A", "A_child"]
-    events = expand_node(node, existing)  # type: ignore[arg-type]
-    assert len(events) == 1
-    assert events[0].type == "updateNode"
-
-
-def test_expand_node_idempotent_effect() -> None:
-    graph_spec: GraphSpec = {
-        "nodes": [{"id": "A", "kind": "symbol", "state": "pending"}],
-        "edges": [],
-    }
-    graph = build_graph(graph_spec)
-    existing_nodes = list(graph.nodes)
-
-    events1 = expand_node({"id": "A", "state": "pending"}, existing_nodes)  # type: ignore[arg-type]
-    apply_events(graph, events1)  # type: ignore[arg-type]
-
-    existing_nodes = list(graph.nodes)
-    events2 = expand_node({"id": "A", "state": "pending"}, existing_nodes)  # type: ignore[arg-type]
-    apply_events(graph, events2)  # type: ignore[arg-type]
-
-    normalized = normalize_graph(graph)
-    node_ids_seen = [n["id"] for n in normalized["nodes"]]
-    assert len(node_ids_seen) == len(set(node_ids_seen))
-
-    edge_tuples = [(e["source"], e["target"], e["kind"]) for e in normalized["edges"]]
-    assert len(edge_tuples) == len(set(edge_tuples))
-
-
-def test_expand_node_event_order() -> None:
-    events = expand_node({"id": "A", "state": "pending"}, [])  # type: ignore[arg-type]
-    assert [e.type for e in events] == ["addNodes", "addEdges", "updateNode"]
-
-
-def test_roundtrip_stability() -> None:
-    spec: GraphSpec = {
-        "nodes": [
-            {"id": "A", "kind": "symbol", "state": "pending"},
-            {"id": "B", "kind": "symbol", "state": "pending"},
-        ],
-        "edges": [{"source": "A", "target": "B", "kind": "calls"}],
-    }
-    g1 = build_graph(spec)
-
-    events: list[EventSpec] = [
-        {"type": "addNodes", "nodes": ["A", "B"]},
-        {"type": "addEdges", "edges": [{"source": "A", "target": "B", "kind": "calls"}]},
-    ]
-
-    g2 = build_graph(cast(GraphSpec, {"nodes": [], "edges": []}))
-    apply_events(g2, events)
-
-    assert normalize_graph(g1) == normalize_graph(g2)
-
-
-@given(event_sequences)
-def test_deterministic_replay(events: list[EventSpec]) -> None:
-    empty_spec: GraphSpec = {"nodes": [], "edges": []}
-    g1 = build_graph(empty_spec)
-    g2 = build_graph(empty_spec)
-
-    for event in events:
-        try:
-            apply_events(g1, [event])
-            apply_events(g2, [event])
-        except ValueError:
-            break
-
-    assert normalize_graph(g1) == normalize_graph(g2)
-</file>
 
 <file path=".hypothesis/constants/13b75172fffe16dc">
 # file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
@@ -324,11 +149,25 @@ def test_deterministic_replay(events: list[EventSpec]) -> None:
 ['EventSpec', 'GraphSnapshot', 'GraphSpec', 'GraphType', 'apply_events', 'build_graph', 'debug_run', 'graphs_equal', 'normalize_graph', 'render_steps', 'run_expansion_steps', 'select_first_node']
 </file>
 
+<file path=".hypothesis/constants/4b3f3fce4bc17216">
+# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'id', 'pending', 'run_traversal', 'score_node', 'select_next_node', 'state', 'tokens']
+</file>
+
 <file path=".hypothesis/constants/58d3fceec14484db">
 # file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/snapshot_graph.py
 # hypothesis_version: 6.151.9
 
 ['GraphSnapshot', 'addEdges', 'addNodes', 'data', 'edge', 'edges', 'event', 'events', 'evidence', 'file', 'graph', 'id', 'iteration', 'kind', 'node', 'nodes', 'normalize_edge', 'normalize_event', 'normalize_graph', 'normalize_node', 'patch', 'primary', 'render_steps', 'snippet', 'source', 'startLine', 'state', 'step', 'target', 'to_event_dict', 'tokens', 'type', 'updateNode']
+</file>
+
+<file path=".hypothesis/constants/85d613f1ebc3ccc9">
+# file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
+# hypothesis_version: 6.151.9
+
+['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'ExpansionPolicy', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'UpdateNodeEvent', 'create_event_subject', 'get_frontier', 'run_traversal', 'score_node', 'select_next_node']
 </file>
 
 <file path=".hypothesis/constants/a3db2a2929b77630">
@@ -3793,44 +3632,6 @@ If you want next, I can:
 But this plan is solid and ready to execute.
 </file>
 
-<file path="src/iterative_context/__init__.py">
-"""Iterative Context package exports."""
-
-from .graph_models import (  # noqa: F401
-    AddEdgesEvent,
-    AddNodesEvent,
-    AnchorNode,
-    Evidence,
-    Graph,
-    GraphEdge,
-    GraphEvent,
-    GraphNode,
-    IterationEvent,
-    PendingNode,
-    PrunedNode,
-    ResolvedNode,
-    UpdateNodeEvent,
-    create_event_subject,
-)
-
-__all__ = [
-    "GraphNode",
-    "GraphEdge",
-    "GraphEvent",
-    "Graph",
-    "create_event_subject",
-    "AddNodesEvent",
-    "AddEdgesEvent",
-    "UpdateNodeEvent",
-    "IterationEvent",
-    "PendingNode",
-    "PrunedNode",
-    "AnchorNode",
-    "ResolvedNode",
-    "Evidence",
-]
-</file>
-
 <file path="src/iterative_context/expansion.py">
 # iterative-context/src/iterative_context/expansion.py
 
@@ -3934,6 +3735,91 @@ def expand_node(
 
 
 __all__ = ["expand_node"]
+</file>
+
+<file path="src/iterative_context/traversal.py">
+# iterative-context/src/iterative_context/traversal.py
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Protocol, cast
+
+from iterative_context.expansion import expand_node
+from iterative_context.graph_models import Graph, GraphEvent, GraphNode
+from iterative_context.test_helpers.graph_dsl import apply_events
+
+
+def get_frontier(graph: Graph) -> list[GraphNode]:
+    """Return pending nodes eligible for expansion, sorted deterministically by id."""
+    frontier: list[GraphNode] = []
+    for _, data in graph.nodes(data=True):
+        node = cast(GraphNode, data["data"] if isinstance(data, dict) and "data" in data else data)
+        if getattr(node, "state", None) == "pending":
+            frontier.append(node)
+    frontier.sort(key=lambda n: n.id)
+    return frontier
+
+
+def score_node(node: GraphNode, graph: Graph, step: int) -> float:
+    """Assign a deterministic score to a node."""
+    score = 0.0
+    if node.state == "pending":
+        score += 5.0
+    if getattr(node, "state", None) == "anchor":
+        score += 10.0
+
+    degree = graph.in_degree(node.id) + graph.out_degree(node.id)
+    score += degree * 0.5
+
+    tokens = getattr(node, "tokens", None)
+    if tokens is not None:
+        score += min(tokens, 50) * 0.1
+
+    return score
+
+
+def select_next_node(graph: Graph, step: int) -> GraphNode:
+    """Select the best node to expand."""
+    frontier = get_frontier(graph)
+    if not frontier:
+        raise ValueError("No pending nodes available for selection")
+    return max(frontier, key=lambda n: (score_node(n, graph, step), n.id))
+
+
+class ExpansionPolicy(Protocol):
+    def expand(self, node: GraphNode, graph: Graph) -> Sequence[GraphEvent]:
+        ...
+
+
+class DefaultExpansionPolicy:
+    def expand(self, node: GraphNode, graph: Graph) -> Sequence[GraphEvent]:
+        return expand_node(
+            {"id": node.id, "state": node.state},
+            list(graph.nodes),
+        )
+
+
+def run_traversal(graph: Graph, steps: int, expansion_policy: ExpansionPolicy) -> Graph:
+    """Run N expansion steps."""
+    for step in range(steps):
+        frontier = get_frontier(graph)
+        if not frontier:
+            break
+        node = select_next_node(graph, step)
+        events = expansion_policy.expand(node, graph)
+        apply_events(graph, events)
+    return graph
+
+
+__all__ = [
+    "get_frontier",
+    "score_node",
+    "select_next_node",
+    "ExpansionPolicy",
+    "DefaultExpansionPolicy",
+    "run_traversal",
+]
 </file>
 
 <file path="tests/snapshots/test_expansion/test_expand_idempotent/graph">
@@ -4825,6 +4711,42 @@ __all__ = ["expand_node"]
 }
 </file>
 
+<file path="tests/snapshots/test_traversal_selection/test_traversal_changes_with_scoring/graph">
+{
+  "edges": [
+    {
+      "kind": "calls",
+      "source": "A",
+      "target": "A_child"
+    },
+    {
+      "kind": "calls",
+      "source": "A_child",
+      "target": "A_child_child"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "A",
+      "kind": "symbol",
+      "state": "resolved",
+      "tokens": 1
+    },
+    {
+      "id": "A_child",
+      "kind": "symbol",
+      "state": "resolved",
+      "tokens": 1
+    },
+    {
+      "id": "A_child_child",
+      "kind": "symbol",
+      "state": "pending"
+    }
+  ]
+}
+</file>
+
 <file path="tests/test_expansion_metamorphic.py">
 # pyright: reportMissingTypeStubs=false
 from typing import cast
@@ -4960,126 +4882,6 @@ def test_edge_duplication_stability():
     assert normalize_graph(result_base) == normalize_graph(result_dup)
 </file>
 
-<file path="tests/test_expansion_properties.py">
-# pyright: reportMissingTypeStubs=false
-from typing import Any
-
-from hypothesis import given
-from hypothesis import strategies as st
-
-from iterative_context.expansion import expand_node  # type: ignore
-
-node_ids: st.SearchStrategy[str] = st.text(min_size=1, max_size=5)
-existing_nodes: st.SearchStrategy[list[str]] = st.lists(node_ids, unique=True, max_size=5)
-
-
-def _make_node(nid: str) -> dict[str, str]:
-    return {"id": nid, "state": "pending"}
-
-
-node_strategy: st.SearchStrategy[dict[str, str]] = st.builds(_make_node, node_ids)
-
-
-@given(node_strategy, existing_nodes)
-def test_expand_deterministic(node: dict[str, str], existing: list[str]):
-    ev1 = expand_node(node, existing)
-    ev2 = expand_node(node, existing)
-    assert ev1 == ev2
-
-
-@given(node_ids)
-def test_expand_idempotent(node_id: str):
-    node: dict[str, str] = {"id": node_id, "state": "pending"}
-    existing: list[str] = [node_id, f"{node_id}_child"]
-
-    events = expand_node(node, existing)
-
-    assert len(events) == 1
-    assert events[0].type == "updateNode"
-
-
-@given(node_strategy, existing_nodes)
-def test_no_duplicate_nodes(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
-
-    added: set[str] = set()
-    for e in events:
-        if e.type == "addNodes":
-            for n in e.nodes:
-                assert n.id not in added
-                added.add(n.id)
-
-
-@given(node_strategy, existing_nodes)
-def test_edges_valid(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
-
-    known: set[str] = {node["id"], *existing}
-
-    for e in events:
-        if e.type == "addNodes":
-            for n in e.nodes:
-                known.add(n.id)
-
-        if e.type == "addEdges":
-            for edge in e.edges:
-                assert edge.source in known
-                assert edge.target in known
-
-
-@given(node_strategy, existing_nodes)
-def test_event_ordering(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
-
-    seen_nodes: set[str] = {node["id"], *existing}
-
-    for e in events:
-        if e.type == "addNodes":
-            for n in e.nodes:
-                seen_nodes.add(n.id)
-
-        if e.type == "addEdges":
-            for edge in e.edges:
-                assert edge.source in seen_nodes
-                assert edge.target in seen_nodes
-
-
-@given(node_strategy, existing_nodes)
-def test_no_redundant_addnodes(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
-
-    added: set[str] = set()
-
-    for e in events:
-        if e.type == "addNodes":
-            for n in e.nodes:
-                assert n.id not in added
-                added.add(n.id)
-
-
-@given(node_ids)
-def test_single_child(node_id: str):
-    node: dict[str, str] = {"id": node_id, "state": "pending"}
-
-    events: list[Any] = expand_node(node, [node_id])
-
-    created: list[str] = [
-        n.id
-        for e in events
-        if e.type == "addNodes"
-        for n in e.nodes
-    ]
-
-    assert len(created) <= 1
-
-
-@given(node_strategy, existing_nodes)
-def test_update_node_always_present(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
-
-    assert any(e.type == "updateNode" for e in events)
-</file>
-
 <file path="tests/test_expansion.py">
 from typing import Any
 
@@ -5163,6 +4965,257 @@ def test_valid_edge_structure():
     assert edge.source == "A"
     assert edge.target == "A_child"
     assert edge.kind == "calls"
+</file>
+
+<file path="tests/test_graph_invariants.py">
+# pyright: reportMissingTypeStubs=false
+from __future__ import annotations
+
+from typing import cast
+
+from hypothesis import given
+from hypothesis import strategies as st
+
+from iterative_context.expansion import expand_node  # type: ignore
+from iterative_context.test_helpers import (
+    EventSpec,
+    GraphSpec,
+    GraphType,
+    apply_events,
+    build_graph,
+    normalize_graph,
+)
+
+
+def assert_graph_valid(graph: GraphType) -> None:
+    allowed_states = {"pending", "resolved", "anchor", "pruned"}
+    normalized = normalize_graph(graph)
+
+    node_ids: list[str] = []
+    for node in normalized["nodes"]:
+        node_id = node["id"]
+        assert node_id not in node_ids
+        node_ids.append(node_id)
+        assert node["state"] in allowed_states
+
+    nodes_seen = set(node_ids)
+
+    edges_seen: set[tuple[str, str, str]] = set()
+    for edge in normalized["edges"]:
+        key = (edge["source"], edge["target"], edge["kind"])
+        assert key not in edges_seen
+        edges_seen.add(key)
+
+        assert edge["source"] in nodes_seen
+        assert edge["target"] in nodes_seen
+
+
+node_ids: st.SearchStrategy[str] = st.text(min_size=1, max_size=3)
+
+
+def make_edge_spec(s: str, t: str, k: str) -> dict[str, str]:
+    return {"source": s, "target": t, "kind": k}
+
+
+def make_add_nodes(ns: list[str]) -> EventSpec:
+    return cast(EventSpec, {"type": "addNodes", "nodes": ns})
+
+
+def make_add_edges(edges: list[dict[str, str]]) -> EventSpec:
+    return cast(EventSpec, {"type": "addEdges", "edges": edges})
+
+
+def make_update_node(nid: str) -> EventSpec:
+    return cast(
+        EventSpec,
+        {"type": "updateNode", "id": nid, "patch": {"state": "resolved", "tokens": 1}},
+    )
+
+
+edge_spec_strategy: st.SearchStrategy[dict[str, str]] = st.builds(
+    make_edge_spec,
+    node_ids,
+    node_ids,
+    st.sampled_from(["calls", "imports", "references"]),
+)
+event_strategy: st.SearchStrategy[EventSpec] = st.one_of(
+    st.builds(
+        make_add_nodes,
+        st.lists(node_ids, min_size=1, max_size=3, unique=True),
+    ),
+    st.builds(
+        make_add_edges,
+        st.lists(edge_spec_strategy, min_size=1, max_size=3),
+    ),
+    st.builds(
+        make_update_node,
+        node_ids,
+    ),
+    st.just(cast(EventSpec, {"type": "iteration", "step": 0})),
+)
+event_sequences: st.SearchStrategy[list[EventSpec]] = st.lists(event_strategy, max_size=6)
+
+
+@given(event_sequences)
+def test_graph_always_valid(events: list[EventSpec]) -> None:
+    base_spec: GraphSpec = {"nodes": [], "edges": []}
+    graph = build_graph(base_spec)
+    for event in events:
+        try:
+            apply_events(graph, [event])
+        except ValueError:
+            break
+    assert_graph_valid(graph)
+
+
+def test_expand_node_deterministic() -> None:
+    node = {"id": "A", "state": "pending"}
+    existing = ["A"]
+    events1 = expand_node(node, existing)  # type: ignore[arg-type]
+    events2 = expand_node(node, existing)  # type: ignore[arg-type]
+    assert events1 == events2
+
+
+def test_expand_node_minimal_when_child_exists() -> None:
+    node = {"id": "A", "state": "pending"}
+    existing = ["A", "A_child"]
+    events = expand_node(node, existing)  # type: ignore[arg-type]
+    assert len(events) == 1
+    assert events[0].type == "updateNode"
+
+
+def test_expand_node_idempotent_effect() -> None:
+    graph_spec: GraphSpec = {
+        "nodes": [{"id": "A", "kind": "symbol", "state": "pending"}],
+        "edges": [],
+    }
+    graph = build_graph(graph_spec)
+    existing_nodes = list(graph.nodes)
+
+    events1 = expand_node({"id": "A", "state": "pending"}, existing_nodes)  # type: ignore[arg-type]
+    apply_events(graph, events1)  # type: ignore[arg-type]
+
+    existing_nodes = list(graph.nodes)
+    events2 = expand_node({"id": "A", "state": "pending"}, existing_nodes)  # type: ignore[arg-type]
+    apply_events(graph, events2)  # type: ignore[arg-type]
+
+    normalized = normalize_graph(graph)
+    node_ids_seen = [n["id"] for n in normalized["nodes"]]
+    assert len(node_ids_seen) == len(set(node_ids_seen))
+
+    edge_tuples = [(e["source"], e["target"], e["kind"]) for e in normalized["edges"]]
+    assert len(edge_tuples) == len(set(edge_tuples))
+
+
+def test_expand_node_event_order() -> None:
+    events = expand_node({"id": "A", "state": "pending"}, [])  # type: ignore[arg-type]
+    assert [e.type for e in events] == ["addNodes", "addEdges", "updateNode"]
+
+
+def test_roundtrip_stability() -> None:
+    spec: GraphSpec = {
+        "nodes": [
+            {"id": "A", "kind": "symbol", "state": "pending"},
+            {"id": "B", "kind": "symbol", "state": "pending"},
+        ],
+        "edges": [{"source": "A", "target": "B", "kind": "calls"}],
+    }
+    g1 = build_graph(spec)
+
+    events: list[EventSpec] = [
+        {"type": "addNodes", "nodes": ["A", "B"]},
+        {"type": "addEdges", "edges": [{"source": "A", "target": "B", "kind": "calls"}]},
+    ]
+
+    g2 = build_graph(cast(GraphSpec, {"nodes": [], "edges": []}))
+    apply_events(g2, events)
+
+    assert normalize_graph(g1) == normalize_graph(g2)
+
+
+@given(event_sequences)
+def test_deterministic_replay(events: list[EventSpec]) -> None:
+    empty_spec: GraphSpec = {"nodes": [], "edges": []}
+    g1 = build_graph(empty_spec)
+    g2 = build_graph(empty_spec)
+
+    for event in events:
+        try:
+            apply_events(g1, [event])
+            apply_events(g2, [event])
+        except ValueError:
+            break
+
+    assert normalize_graph(g1) == normalize_graph(g2)
+</file>
+
+<file path="tests/test_traversal_selection.py">
+from iterative_context.test_helpers import GraphSnapshot, GraphType, build_graph
+from iterative_context.traversal import DefaultExpansionPolicy, run_traversal, select_next_node
+
+
+def test_selects_highest_score():
+    spec = {
+        "nodes": [
+            {"id": "A", "kind": "symbol", "state": "pending", "tokens": 0},
+            {"id": "B", "kind": "symbol", "state": "pending", "tokens": 20},
+            {"id": "C", "kind": "symbol", "state": "pending", "tokens": 5},
+        ],
+        "edges": [
+            {"source": "A", "target": "B", "kind": "calls"},
+            {"source": "B", "target": "C", "kind": "calls"},
+        ],
+    }
+    graph = build_graph(spec)  # type: ignore[arg-type]
+
+    selected = select_next_node(graph, step=0)
+    assert selected.id == "B"
+
+
+def test_selection_deterministic():
+    spec = {
+        "nodes": [
+            {"id": "A", "kind": "symbol", "state": "pending", "tokens": 0},
+            {"id": "B", "kind": "symbol", "state": "pending", "tokens": 10},
+        ],
+        "edges": [{"source": "A", "target": "B", "kind": "calls"}],
+    }
+    graph = build_graph(spec)  # type: ignore[arg-type]
+
+    sel1 = select_next_node(graph, step=1)
+    sel2 = select_next_node(graph, step=1)
+    assert sel1.id == sel2.id
+
+
+def test_selection_not_affected_by_irrelevant_node():
+    base_spec = {
+        "nodes": [
+            {"id": "A", "kind": "symbol", "state": "pending", "tokens": 0},
+            {"id": "B", "kind": "symbol", "state": "pending", "tokens": 30},
+        ],
+        "edges": [{"source": "A", "target": "B", "kind": "calls"}],
+    }
+    base_graph = build_graph(base_spec)  # type: ignore[arg-type]
+    base_selected = select_next_node(base_graph, step=0)
+
+    noisy_spec = {
+        "nodes": [
+            *base_spec["nodes"],
+            {"id": "Z", "kind": "symbol", "state": "pending", "tokens": 0},
+        ],
+        "edges": base_spec["edges"],
+    }
+    noisy_graph = build_graph(noisy_spec)  # type: ignore[arg-type]
+    noisy_selected = select_next_node(noisy_graph, step=0)
+
+    assert base_selected.id == noisy_selected.id
+
+
+def test_traversal_changes_with_scoring(snapshot_graph: GraphSnapshot):
+    graph: GraphType = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}]})  # type: ignore[arg-type]
+    policy = DefaultExpansionPolicy()
+    run_traversal(graph, steps=2, expansion_policy=policy)
+    snapshot_graph.assert_graph(graph)  # type: ignore[arg-type]
 </file>
 
 <file path=".gitignore">
@@ -6504,6 +6557,58 @@ __all__ = [
 ]
 </file>
 
+<file path="src/iterative_context/__init__.py">
+"""Iterative Context package exports."""
+
+from .graph_models import (  # noqa: F401
+    AddEdgesEvent,
+    AddNodesEvent,
+    AnchorNode,
+    Evidence,
+    Graph,
+    GraphEdge,
+    GraphEvent,
+    GraphNode,
+    IterationEvent,
+    PendingNode,
+    PrunedNode,
+    ResolvedNode,
+    UpdateNodeEvent,
+    create_event_subject,
+)
+from .traversal import (  # noqa: F401
+    DefaultExpansionPolicy,
+    ExpansionPolicy,
+    get_frontier,
+    run_traversal,
+    score_node,
+    select_next_node,
+)
+
+__all__ = [
+    "GraphNode",
+    "GraphEdge",
+    "GraphEvent",
+    "Graph",
+    "create_event_subject",
+    "AddNodesEvent",
+    "AddEdgesEvent",
+    "UpdateNodeEvent",
+    "IterationEvent",
+    "PendingNode",
+    "PrunedNode",
+    "AnchorNode",
+    "ResolvedNode",
+    "Evidence",
+    "get_frontier",
+    "score_node",
+    "select_next_node",
+    "ExpansionPolicy",
+    "DefaultExpansionPolicy",
+    "run_traversal",
+]
+</file>
+
 <file path="src/iterative_context/graph_models.py">
 # iterative-context/graph_models.py
 
@@ -6633,6 +6738,138 @@ __all__ = [
     "Graph",
     "create_event_subject",
 ]
+</file>
+
+<file path="tests/test_expansion_properties.py">
+# pyright: reportMissingTypeStubs=false
+from typing import Any
+
+from hypothesis import given
+from hypothesis import strategies as st
+
+from iterative_context.expansion import expand_node  # type: ignore
+
+# 🔧 knobs
+MAX_NODE_ID_SIZE = 5
+MAX_NODES = 5
+
+
+# strategies
+node_ids: st.SearchStrategy[str] = st.text(
+    min_size=1,
+    max_size=MAX_NODE_ID_SIZE,
+)
+
+existing_nodes: st.SearchStrategy[list[str]] = st.lists(
+    node_ids,
+    unique=True,
+    max_size=MAX_NODES,
+)
+
+
+def _make_node(nid: str) -> dict[str, str]:
+    return {"id": nid, "state": "pending"}
+
+
+node_strategy: st.SearchStrategy[dict[str, str]] = st.builds(
+    _make_node,
+    node_ids,
+)
+
+
+@given(node_strategy, existing_nodes)
+def test_expand_deterministic(node: dict[str, str], existing: list[str]):
+    ev1 = expand_node(node, existing)
+    ev2 = expand_node(node, existing)
+    assert ev1 == ev2
+
+
+@given(node_ids)
+def test_expand_idempotent(node_id: str):
+    node: dict[str, str] = {"id": node_id, "state": "pending"}
+    existing: list[str] = [node_id, f"{node_id}_child"]
+
+    events = expand_node(node, existing)
+
+    assert len(events) == 1
+    assert events[0].type == "updateNode"
+
+
+@given(node_strategy, existing_nodes)
+def test_no_duplicate_nodes(node: dict[str, str], existing: list[str]):
+    events: list[Any] = expand_node(node, existing)
+
+    added: set[str] = set()
+    for e in events:
+        if e.type == "addNodes":
+            for n in e.nodes:
+                assert n.id not in added
+                added.add(n.id)
+
+
+@given(node_strategy, existing_nodes)
+def test_edges_valid(node: dict[str, str], existing: list[str]):
+    events: list[Any] = expand_node(node, existing)
+
+    known: set[str] = {node["id"], *existing}
+
+    for e in events:
+        if e.type == "addNodes":
+            for n in e.nodes:
+                known.add(n.id)
+
+        if e.type == "addEdges":
+            for edge in e.edges:
+                assert edge.source in known
+                assert edge.target in known
+
+
+@given(node_strategy, existing_nodes)
+def test_event_ordering(node: dict[str, str], existing: list[str]):
+    events: list[Any] = expand_node(node, existing)
+
+    seen_nodes: set[str] = {node["id"], *existing}
+
+    for e in events:
+        if e.type == "addNodes":
+            for n in e.nodes:
+                seen_nodes.add(n.id)
+
+        if e.type == "addEdges":
+            for edge in e.edges:
+                assert edge.source in seen_nodes
+                assert edge.target in seen_nodes
+
+
+@given(node_strategy, existing_nodes)
+def test_no_redundant_addnodes(node: dict[str, str], existing: list[str]):
+    events: list[Any] = expand_node(node, existing)
+
+    added: set[str] = set()
+
+    for e in events:
+        if e.type == "addNodes":
+            for n in e.nodes:
+                assert n.id not in added
+                added.add(n.id)
+
+
+@given(node_ids)
+def test_single_child(node_id: str):
+    node: dict[str, str] = {"id": node_id, "state": "pending"}
+
+    events: list[Any] = expand_node(node, [node_id])
+
+    created: list[str] = [n.id for e in events if e.type == "addNodes" for n in e.nodes]
+
+    assert len(created) <= 1
+
+
+@given(node_strategy, existing_nodes)
+def test_update_node_always_present(node: dict[str, str], existing: list[str]):
+    events: list[Any] = expand_node(node, existing)
+
+    assert any(e.type == "updateNode" for e in events)
 </file>
 
 <file path="pyproject.toml">
