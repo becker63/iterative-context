@@ -14,16 +14,14 @@ def test_linear_expansion(snapshot_graph: GraphSnapshot, snapshot: Any):
     # initial graph with a single node "A"
     initial = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}]})  # type: ignore
     graph = initial  # type: ignore
-    existing_nodes = list(graph.nodes)  # type: ignore
     all_events = []
 
     current = "A"
     # perform three expansions along a linear chain
     for _ in range(3):
-        events = expand_node({"id": current, "state": "pending"}, existing_nodes)
+        events = expand_node({"id": current, "state": "pending"}, graph)
         all_events.extend(events)  # type: ignore[arg-type]
         graph = apply_events(graph, events)  # type: ignore
-        existing_nodes = list(graph.nodes)  # type: ignore[arg-type]
         current = f"{current}_child"
 
     # replay and snapshot the step trace
@@ -42,30 +40,38 @@ def test_expand_idempotent(snapshot_graph: GraphSnapshot):
             ]
         }
     )
-    events = expand_node({"id": "A", "state": "pending"}, list(graph.nodes))  # type: ignore
+    events = expand_node({"id": "A", "state": "pending"}, graph)  # type: ignore
     final_graph = apply_events(graph, events)  # type: ignore
     snapshot_graph.assert_graph(final_graph)  # type: ignore
 
 
 def test_expand_deterministic():
     node = {"id": "A", "state": "pending"}
-    existing = ["A"]
-    ev1 = expand_node(node, existing)
-    ev2 = expand_node(node, existing)
+    graph = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}]})  # type: ignore
+    ev1 = expand_node(node, graph)
+    ev2 = expand_node(node, graph)
     assert ev1 == ev2
 
 
 def test_no_duplicate_child():
     node = {"id": "A", "state": "pending"}
-    existing = ["A", "A_child"]
-    events = expand_node(node, existing)
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": "A", "kind": "symbol", "state": "pending"},
+                {"id": "A_child", "kind": "symbol", "state": "pending"},
+            ]
+        }
+    )  # type: ignore[arg-type]
+    events = expand_node(node, graph)
     assert len(events) == 1
     assert events[0].type == "updateNode"
 
 
 def test_no_branching():
     node = {"id": "A", "state": "pending"}
-    events = expand_node(node, ["A"])
+    graph = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}]})  # type: ignore[arg-type]
+    events = expand_node(node, graph)
     add_nodes_event = next(e for e in events if e.type == "addNodes")
     assert len(add_nodes_event.nodes) == 1
     total_created = sum(len(e.nodes) for e in events if e.type == "addNodes")
@@ -74,7 +80,8 @@ def test_no_branching():
 
 def test_valid_edge_structure():
     node = {"id": "A", "state": "pending"}
-    events = expand_node(node, ["A"])
+    graph = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}]})  # type: ignore[arg-type]
+    events = expand_node(node, graph)
     add_edges = next(e for e in events if e.type == "addEdges")
     edge = add_edges.edges[0]
     assert edge.source == "A"

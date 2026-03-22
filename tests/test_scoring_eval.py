@@ -25,7 +25,13 @@ def test_scoring_changes_traversal(snapshot: Snapshot) -> None:
         steps=3,
     )
 
-    normalized = {name: normalize_graph(g) for name, g in results.items()}
+    normalized = {
+        name: {
+            "graph": normalize_graph(data["final_graph"]),  # type: ignore[arg-type]
+            "scores": data["scores"],
+        }
+        for name, data in results.items()
+    }
     snapshot.assert_match(json.dumps(normalized, sort_keys=True, indent=2), "scoring_comparison")
 
 

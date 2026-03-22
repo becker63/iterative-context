@@ -100,16 +100,23 @@ def test_graph_always_valid(events: list[EventSpec]) -> None:
 
 def test_expand_node_deterministic() -> None:
     node = {"id": "A", "state": "pending"}
-    existing = ["A"]
-    events1 = expand_node(node, existing)  # type: ignore[arg-type]
-    events2 = expand_node(node, existing)  # type: ignore[arg-type]
+    graph = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}], "edges": []})
+    events1 = expand_node(node, graph)  # type: ignore[arg-type]
+    events2 = expand_node(node, graph)  # type: ignore[arg-type]
     assert events1 == events2
 
 
 def test_expand_node_minimal_when_child_exists() -> None:
     node = {"id": "A", "state": "pending"}
-    existing = ["A", "A_child"]
-    events = expand_node(node, existing)  # type: ignore[arg-type]
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": "A", "kind": "symbol", "state": "pending"},
+                {"id": "A_child", "kind": "symbol", "state": "pending"},
+            ]
+        }
+    )
+    events = expand_node(node, graph)  # type: ignore[arg-type]
     assert len(events) == 1
     assert events[0].type == "updateNode"
 
@@ -120,13 +127,11 @@ def test_expand_node_idempotent_effect() -> None:
         "edges": [],
     }
     graph = build_graph(graph_spec)
-    existing_nodes = list(graph.nodes)
 
-    events1 = expand_node({"id": "A", "state": "pending"}, existing_nodes)  # type: ignore[arg-type]
+    events1 = expand_node({"id": "A", "state": "pending"}, graph)  # type: ignore[arg-type]
     apply_events(graph, events1)  # type: ignore[arg-type]
 
-    existing_nodes = list(graph.nodes)
-    events2 = expand_node({"id": "A", "state": "pending"}, existing_nodes)  # type: ignore[arg-type]
+    events2 = expand_node({"id": "A", "state": "pending"}, graph)  # type: ignore[arg-type]
     apply_events(graph, events2)  # type: ignore[arg-type]
 
     normalized = normalize_graph(graph)
@@ -138,7 +143,8 @@ def test_expand_node_idempotent_effect() -> None:
 
 
 def test_expand_node_event_order() -> None:
-    events = expand_node({"id": "A", "state": "pending"}, [])  # type: ignore[arg-type]
+    graph = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}], "edges": []})
+    events = expand_node({"id": "A", "state": "pending"}, graph)  # type: ignore[arg-type]
     assert [e.type for e in events] == ["addNodes", "addEdges", "updateNode"]
 
 

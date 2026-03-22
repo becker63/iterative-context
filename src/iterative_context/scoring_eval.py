@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
 
 from iterative_context.graph_models import Graph
 from iterative_context.scoring import score_v1
@@ -27,11 +28,18 @@ def compare_scorings(
     graph_factory: Callable[[], Graph],
     scoring_fns: dict[str, ScoreFn],
     steps: int,
-) -> dict[str, Graph]:
-    results: dict[str, Graph] = {}
+) -> dict[str, dict[str, object]]:
+    results: dict[str, dict[str, object]] = {}
 
     for name, fn in scoring_fns.items():
-        results[name] = run_with_scoring(graph_factory, fn, steps)
+        graph = run_with_scoring(graph_factory, fn, steps)
+        step_graphs = graph.graph.get("graph_steps", [])
+        score_history = graph.graph.get("score_history", [])
+        results[name] = {
+            "final_graph": graph,
+            "steps": step_graphs,
+            "scores": deepcopy(score_history),
+        }
 
     return results
 

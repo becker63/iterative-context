@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable, Sequence
 from typing import Protocol, cast
 
@@ -43,10 +44,12 @@ def score_node(node: GraphNode, graph: Graph, step: int) -> float:
 
 def select_next_node(graph: Graph, step: int, score_fn: ScoreFn) -> GraphNode:
     """Select the best node to expand."""
-    frontier = get_frontier(graph)
-    if not frontier:
+    candidates = get_frontier(graph)
+    if not candidates:
         raise ValueError("No pending nodes available for selection")
-    return max(frontier, key=lambda n: (score_fn(n, graph, step), n.id))
+    scored = [(node, score_fn(node, graph, step)) for node in candidates]
+    graph.graph["last_scores"] = [{"id": node.id, "score": score} for node, score in scored]
+    return max(scored, key=lambda x: (x[1], x[0].id))[0]
 
 
 class ExpansionPolicy(Protocol):
@@ -58,7 +61,7 @@ class DefaultExpansionPolicy:
     def expand(self, node: GraphNode, graph: Graph) -> Sequence[GraphEvent]:
         return expand_node(
             {"id": node.id, "state": node.state},
-            list(graph.nodes),
+            graph,
         )
 
 
@@ -66,13 +69,17 @@ def run_traversal(
     graph: Graph, steps: int, expansion_policy: ExpansionPolicy, score_fn: ScoreFn
 ) -> Graph:
     """Run N expansion steps."""
+    graph.graph.setdefault("graph_steps", [copy.deepcopy(graph)])
+    score_history = graph.graph.setdefault("score_history", [])
     for step in range(steps):
-        frontier = get_frontier(graph)
-        if not frontier:
+        candidates = get_frontier(graph)
+        if not candidates:
             break
         node = select_next_node(graph, step, score_fn)
+        score_history.append(graph.graph.get("last_scores", []))
         events = expansion_policy.expand(node, graph)
         apply_events(graph, events)
+        graph.graph["graph_steps"].append(copy.deepcopy(graph))
     return graph
 
 

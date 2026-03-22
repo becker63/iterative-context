@@ -5,6 +5,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from iterative_context.expansion import expand_node  # type: ignore
+from iterative_context.test_helpers import GraphType, build_graph
 
 # 🔧 knobs
 MAX_NODE_ID_SIZE = 5
@@ -28,6 +29,12 @@ def _make_node(nid: str) -> dict[str, str]:
     return {"id": nid, "state": "pending"}
 
 
+def _graph_with_nodes(node_ids: list[str]) -> GraphType:
+    return build_graph(
+        {"nodes": [{"id": nid, "kind": "symbol", "state": "pending"} for nid in node_ids]}
+    )  # type: ignore[arg-type]
+
+
 node_strategy: st.SearchStrategy[dict[str, str]] = st.builds(
     _make_node,
     node_ids,
@@ -36,8 +43,9 @@ node_strategy: st.SearchStrategy[dict[str, str]] = st.builds(
 
 @given(node_strategy, existing_nodes)
 def test_expand_deterministic(node: dict[str, str], existing: list[str]):
-    ev1 = expand_node(node, existing)
-    ev2 = expand_node(node, existing)
+    graph = _graph_with_nodes(existing + [node["id"]])
+    ev1 = expand_node(node, graph)
+    ev2 = expand_node(node, graph)
     assert ev1 == ev2
 
 
@@ -45,8 +53,9 @@ def test_expand_deterministic(node: dict[str, str], existing: list[str]):
 def test_expand_idempotent(node_id: str):
     node: dict[str, str] = {"id": node_id, "state": "pending"}
     existing: list[str] = [node_id, f"{node_id}_child"]
+    graph = _graph_with_nodes(existing)
 
-    events = expand_node(node, existing)
+    events = expand_node(node, graph)
 
     assert len(events) == 1
     assert events[0].type == "updateNode"
@@ -54,7 +63,8 @@ def test_expand_idempotent(node_id: str):
 
 @given(node_strategy, existing_nodes)
 def test_no_duplicate_nodes(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
+    graph = _graph_with_nodes(existing + [node["id"]])
+    events: list[Any] = expand_node(node, graph)
 
     added: set[str] = set()
     for e in events:
@@ -66,7 +76,8 @@ def test_no_duplicate_nodes(node: dict[str, str], existing: list[str]):
 
 @given(node_strategy, existing_nodes)
 def test_edges_valid(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
+    graph = _graph_with_nodes(existing + [node["id"]])
+    events: list[Any] = expand_node(node, graph)
 
     known: set[str] = {node["id"], *existing}
 
@@ -83,7 +94,8 @@ def test_edges_valid(node: dict[str, str], existing: list[str]):
 
 @given(node_strategy, existing_nodes)
 def test_event_ordering(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
+    graph = _graph_with_nodes(existing + [node["id"]])
+    events: list[Any] = expand_node(node, graph)
 
     seen_nodes: set[str] = {node["id"], *existing}
 
@@ -100,7 +112,8 @@ def test_event_ordering(node: dict[str, str], existing: list[str]):
 
 @given(node_strategy, existing_nodes)
 def test_no_redundant_addnodes(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
+    graph = _graph_with_nodes(existing + [node["id"]])
+    events: list[Any] = expand_node(node, graph)
 
     added: set[str] = set()
 
@@ -115,7 +128,9 @@ def test_no_redundant_addnodes(node: dict[str, str], existing: list[str]):
 def test_single_child(node_id: str):
     node: dict[str, str] = {"id": node_id, "state": "pending"}
 
-    events: list[Any] = expand_node(node, [node_id])
+    graph = _graph_with_nodes([node_id])
+
+    events: list[Any] = expand_node(node, graph)
 
     created: list[str] = [n.id for e in events if e.type == "addNodes" for n in e.nodes]
 
@@ -124,6 +139,7 @@ def test_single_child(node_id: str):
 
 @given(node_strategy, existing_nodes)
 def test_update_node_always_present(node: dict[str, str], existing: list[str]):
-    events: list[Any] = expand_node(node, existing)
+    graph = _graph_with_nodes(existing + [node["id"]])
+    events: list[Any] = expand_node(node, graph)
 
     assert any(e.type == "updateNode" for e in events)

@@ -262,7 +262,6 @@ def run_expansion_steps(
 ) -> tuple[GraphType, list[GraphEvent]]:
     graph = initial_graph
     events: list[GraphEvent] = []
-    existing_nodes = list(graph.nodes)
 
     max_nodes_threshold = 50
     for _ in range(max_steps):
@@ -273,12 +272,11 @@ def run_expansion_steps(
 
         step_events = expand_node(
             {"id": node_id, "state": "pending"},
-            existing_nodes,
+            graph,
         )
 
         events.extend(step_events)
         graph = apply_events(graph, step_events)
-        existing_nodes = list(graph.nodes)
 
     return graph, events
 

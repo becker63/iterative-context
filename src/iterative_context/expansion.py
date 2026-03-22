@@ -21,6 +21,7 @@ from __future__ import annotations
 from iterative_context.graph_models import (
     AddEdgesEvent,
     AddNodesEvent,
+    Graph,
     GraphEdge,
     GraphEvent,
     PendingNode,
@@ -30,7 +31,7 @@ from iterative_context.graph_models import (
 
 def expand_node(
     node_to_expand: dict[str, str],
-    existing_nodes: list[str],
+    graph: Graph,
 ) -> list[GraphEvent]:
     """
     Produce the deterministic sequence of events that expands ``node_to_expand``.
@@ -62,6 +63,7 @@ def expand_node(
     """
     parent_id: str = node_to_expand["id"]
     child_id: str = f"{parent_id}_child"
+    existing_nodes = list(graph.nodes)
 
     events: list[GraphEvent] = []
 
