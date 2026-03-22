@@ -73,6 +73,37 @@ def _iter_calls(fn: FunctionLike) -> list[str]:
     return calls
 
 
+def _iter_call_graph_edges(module: Extracted) -> list[tuple[str, str]]:  # noqa: PLR0912
+    """Extract call edges from module-level call graph when available."""
+    edges: list[tuple[str, str]] = []
+
+    if isinstance(module, ModuleInfo):
+        call_graph = getattr(module, "call_graph", None)
+        call_map = getattr(call_graph, "calls", None) if call_graph else None
+        if isinstance(call_map, dict):
+            typed_call_map = cast(dict[str, object], call_map)
+            for src, targets in typed_call_map.items():
+                if not isinstance(targets, list):
+                    continue
+                for target in cast(list[object], targets):
+                    if isinstance(target, str):
+                        edges.append((src, target))
+    else:
+        call_graph = cast(Mapping[str, object] | None, module.get("call_graph"))
+        if call_graph:
+            call_map = call_graph.get("calls")
+            if isinstance(call_map, Mapping):
+                typed_call_map = cast(Mapping[str, object], call_map)
+                for src, targets in typed_call_map.items():
+                    if not isinstance(targets, list):
+                        continue
+                    for target in cast(list[object], targets):
+                        if isinstance(target, str):
+                            edges.append((src, target))
+
+    return edges
+
+
 def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
     files: list[RawFile] = []
 
@@ -115,6 +146,15 @@ def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
                         kind="call",
                     )
                 )
+
+        for src, target in _iter_call_graph_edges(extracted):
+            edges.append(
+                RawEdge(
+                    source=f"{py_file}:{src}",
+                    target=target,
+                    kind="call",
+                )
+            )
 
         try:
             imports_raw = cast(

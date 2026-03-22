@@ -1,5 +1,6 @@
 """Iterative Context package exports."""
 
+from .exploration import expand, resolve, resolve_and_expand  # noqa: F401
 from .graph_models import (  # noqa: F401
     AddEdgesEvent,
     AddNodesEvent,
@@ -18,6 +19,7 @@ from .graph_models import (  # noqa: F401
 )
 from .scoring import score_degree, score_random, score_v1  # noqa: F401
 from .scoring_eval import compare_scorings, run_with_scoring  # noqa: F401
+from .store import GraphStore, debug_summary  # noqa: F401
 from .traversal import (  # noqa: F401
     DefaultExpansionPolicy,
     ExpansionPolicy,
@@ -55,4 +57,9 @@ __all__ = [
     "score_random",
     "run_with_scoring",
     "compare_scorings",
+    "GraphStore",
+    "debug_summary",
+    "resolve",
+    "expand",
+    "resolve_and_expand",
 ]

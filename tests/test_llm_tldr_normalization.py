@@ -127,3 +127,41 @@ def test_edges_deterministic(repo: tuple[str, Path]) -> None:
     e2 = [(e.source, e.target, e.kind) for f in t2.files for e in f.edges]
 
     assert sorted(e1) == sorted(e2)
+
+
+def test_call_edges_preserved_across_files(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    tree = ingest_repo(path)
+    raw_calls = [
+        (e.source, e.target) for f in tree.files for e in f.edges if e.kind == "call"
+    ]
+
+    graph = raw_tree_to_graph(tree)
+    graph_calls = [
+        (src, dst) for src, dst, data in graph.edges(data=True) if data.get("kind") == "calls"
+    ]
+
+    assert len(graph_calls) == len(raw_calls)
+
+
+def test_unknown_nodes_created(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    tree = ingest_repo(path)
+    graph = raw_tree_to_graph(tree)
+
+    function_ids = {fn.id for raw_file in tree.files for fn in raw_file.functions}
+
+    found_unknown = False
+    for _, dst, data in graph.edges(data=True):
+        if data.get("kind") != "calls":
+            continue
+        if dst not in function_ids:
+            node_data = graph.nodes.get(dst, {})
+            assert node_data, f"call target {dst} missing from graph"
+            assert node_data.get("type") in {"unknown", "module", "function"}
+            if node_data.get("type") == "unknown":
+                found_unknown = True
+
+    assert found_unknown

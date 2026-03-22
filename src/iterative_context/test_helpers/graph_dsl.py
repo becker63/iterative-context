@@ -212,6 +212,7 @@ def apply_events(graph: GraphType, events: Sequence[EventSpec | GraphEvent]) -> 
                     raise ValueError(
                         f"Edge references unknown nodes: {edge.source} -> {edge.target}"
                     )
+            for edge in event.edges:
                 graph.add_edge(edge.source, edge.target, data=edge)
         elif isinstance(event, UpdateNodeEvent):
             node_id = event.id

@@ -43,7 +43,10 @@ The content is organized as follows:
 .hypothesis/
   constants/
     0da054f76284442d
+    0f58eb624e2170a0
     13b75172fffe16dc
+    13e67ff87f8f380a
+    23fb880ae1ff7d5a
     383f9c924987eaf1
     3ce4b39de52f1571
     3e760b36791142ee
@@ -56,11 +59,14 @@ The content is organized as follows:
     7023e2ba4fce5ddc
     7f9e3eeea6979006
     85d613f1ebc3ccc9
+    8dccd3420bee89db
+    8fb503e3d2f9ba89
     9d2294939eab0a40
     a3db2a2929b77630
     a88ac43e57452995
     c5498bdbc490567f
     c992c0107ced249f
+    cf74d0f8b0cbb5e1
     d481fb3784aff943
     d4882342917c3538
     e2ba7639c97a97c8
@@ -68,6 +74,7 @@ The content is organized as follows:
     eb4760634d19d75f
     ed75a52dd5586707
     f24a24344fb8325a
+    fbeac6778bc9b54f
   examples/
     04e6b3400353b141/
       153652fceb7e5784
@@ -111,11 +118,13 @@ src/
       snapshot_graph.py
     __init__.py
     expansion.py
+    exploration.py
     graph_models.py
     normalize.py
     raw_tree.py
     scoring_eval.py
     scoring.py
+    store.py
     traversal.py
 tests/
   snapshots/
@@ -140,9 +149,11 @@ tests/
   conftest.py
   test_expansion_metamorphic.py
   test_expansion_properties.py
+  test_expansion_vs_query.py
   test_expansion.py
   test_graph_invariants.py
   test_graph_models.py
+  test_graph_store.py
   test_ingest_llm_tldr.py
   test_llm_tldr_normalization.py
   test_scoring_eval.py
@@ -160,11 +171,366 @@ README.md
 <files>
 This section contains the contents of the repository's files.
 
+<file path=".hypothesis/constants/0f58eb624e2170a0">
+# file: /home/becker/projects/iterative-context/src/iterative_context/normalize.py
+# hypothesis_version: 6.151.9
+
+['call', 'calls', 'file', 'function', 'import', 'imports', 'module', 'symbol', 'type', 'unknown']
+</file>
+
+<file path=".hypothesis/constants/13e67ff87f8f380a">
+# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
+# hypothesis_version: 6.151.9
+
+['id', 'pending', 'state']
+</file>
+
+<file path=".hypothesis/constants/23fb880ae1ff7d5a">
+# file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
+# hypothesis_version: 6.151.9
+
+['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'ExpansionPolicy', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'GraphStore', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'ScoreFn', 'UpdateNodeEvent', 'compare_scorings', 'create_event_subject', 'debug_summary', 'get_frontier', 'run_traversal', 'run_with_scoring', 'score_degree', 'score_node', 'score_random', 'score_v1', 'select_next_node']
+</file>
+
+<file path=".hypothesis/constants/8dccd3420bee89db">
+# file: /home/becker/projects/iterative-context/src/iterative_context/expansion.py
+# hypothesis_version: 6.151.9
+
+['calls', 'expand_node', 'id', 'resolved', 'state', 'symbol', 'tokens']
+</file>
+
+<file path=".hypothesis/constants/8fb503e3d2f9ba89">
+# file: /home/becker/projects/iterative-context/src/iterative_context/store.py
+# hypothesis_version: 6.151.9
+
+['calls', 'data', 'edges', 'file', 'id', 'imports', 'kind', 'nodes', 'primary', 'references', 'symbol']
+</file>
+
+<file path=".hypothesis/constants/cf74d0f8b0cbb5e1">
+# file: /home/becker/projects/iterative-context/src/iterative_context/store.py
+# hypothesis_version: 6.151.9
+
+['calls', 'edges', 'file', 'id', 'imports', 'kind', 'nodes', 'primary', 'references', 'symbol']
+</file>
+
+<file path=".hypothesis/constants/fbeac6778bc9b54f">
+# file: /home/becker/projects/iterative-context/src/iterative_context/injest/llm_tldr_adapter.py
+# hypothesis_version: 6.151.9
+
+['*.py', '.venv', '__pycache__', 'call', 'call_graph', 'called_functions', 'calls', 'functions', 'import', 'imports', 'module', 'name', 'python']
+</file>
+
+<file path="src/iterative_context/exploration.py">
+from iterative_context.expansion import expand_node
+from iterative_context.graph_models import Graph
+from iterative_context.store import GraphStore
+from iterative_context.test_helpers.graph_dsl import apply_events
+
+
+def expand_from_node(
+    node_id: str,
+    graph: Graph,
+    depth: int,
+) -> set[str]:
+    """
+    ORCHESTRATION LAYER.
+
+    This function composes mutation + query to perform bounded expansion.
+
+    It:
+    - calls expand_node (mutation)
+    - applies events
+    - uses GraphStore (query)
+    - repeats for depth
+
+    It DOES NOT replace expand_node or GraphStore.
+    It sits ABOVE them.
+    """
+    store = GraphStore(graph)
+    frontier = [node_id]
+
+    for _ in range(depth):
+        next_frontier: list[str] = []
+
+        for nid in frontier:
+            node_data = store.nodes_by_id.get(nid)
+            if node_data is None:
+                continue
+
+            events = expand_node({"id": nid, "state": node_data.get("state", "pending")}, graph)
+            apply_events(graph, events)
+
+            store = GraphStore(graph)  # rebuild after mutation
+            neighbors = store.get_neighbors(nid)
+            next_frontier.extend(neighbors)
+
+        frontier = list(set(next_frontier))
+
+    return store.get_neighborhood(node_id, radius=depth)
+</file>
+
+<file path="src/iterative_context/store.py">
+from collections import deque
+from typing import Any
+
+from iterative_context.graph_models import Graph, GraphEdge
+
+
+class GraphStore:
+    """
+    READ-ONLY PROJECTION LAYER.
+
+    This class provides indexed, queryable access to the graph.
+
+    It MUST NOT:
+    - mutate the graph
+    - emit events
+    - perform expansion
+
+    It only answers questions about the current graph state.
+    """
+    def __init__(self, graph: Graph):
+        self.graph = graph
+
+        self.nodes_by_id: dict[str, dict[str, Any]] = {}
+        self.nodes_by_symbol: dict[str, list[str]] = {}
+        self.nodes_by_file: dict[str, list[str]] = {}
+
+        self.out_edges: dict[str, list[GraphEdge]] = {}
+        self.in_edges: dict[str, list[GraphEdge]] = {}
+
+        self._build_indexes()
+
+    def _build_indexes(self) -> None:
+        for node_id, data in sorted(self.graph.nodes(data=True), key=lambda item: item[0]):
+            node_data = dict(data)
+            self.nodes_by_id[node_id] = node_data
+
+            symbol = node_data.get("symbol")
+            if isinstance(symbol, str):
+                self.nodes_by_symbol.setdefault(symbol, []).append(node_id)
+
+            file_value = node_data.get("file")
+            if isinstance(file_value, str):
+                self.nodes_by_file.setdefault(file_value, []).append(node_id)
+
+        for src, dst, data in sorted(
+            self.graph.edges(data=True), key=lambda item: (item[0], item[1])
+        ):
+            kind_value = data.get("kind")
+            if kind_value not in {"calls", "imports", "references"}:
+                data_obj = data.get("data")
+                if isinstance(data_obj, GraphEdge):
+                    kind_value = data_obj.kind
+            kind = kind_value if isinstance(kind_value, str) else "references"
+
+            edge = GraphEdge(
+                source=src,
+                target=dst,
+                kind=kind,  # type: ignore[arg-type]
+                id=data.get("id"),
+                primary=data.get("primary"),
+            )
+
+            self.out_edges.setdefault(src, []).append(edge)
+            self.in_edges.setdefault(dst, []).append(edge)
+
+    def find_symbol(self, symbol: str) -> list[str]:
+        return list(self.nodes_by_symbol.get(symbol, []))
+
+    def get_neighbors(self, node_id: str, kinds: list[str] | None = None) -> list[str]:
+        neighbors: set[str] = set()
+
+        for edge in self.out_edges.get(node_id, []):
+            if kinds is None or edge.kind in kinds:
+                neighbors.add(edge.target)
+
+        for edge in self.in_edges.get(node_id, []):
+            if kinds is None or edge.kind in kinds:
+                neighbors.add(edge.source)
+
+        return sorted(neighbors)
+
+    def get_neighborhood(self, node_id: str, radius: int) -> set[str]:
+        if radius < 0:
+            return set()
+
+        visited: set[str] = set()
+        queue: deque[tuple[str, int]] = deque()
+        queue.append((node_id, 0))
+        visited.add(node_id)
+
+        while queue:
+            current, dist = queue.popleft()
+            if dist >= radius:
+                continue
+
+            for neighbor in self.get_neighbors(current):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append((neighbor, dist + 1))
+
+        return visited
+
+
+def debug_summary(store: GraphStore) -> dict[str, int]:
+    return {
+        "nodes": len(store.nodes_by_id),
+        "edges": sum(len(v) for v in store.out_edges.values()),
+    }
+</file>
+
+<file path="tests/test_expansion_vs_query.py">
+import pytest
+
+from iterative_context.exploration import expand_from_node
+from iterative_context.graph_models import Graph
+from iterative_context.store import GraphStore
+from iterative_context.test_helpers.graph_dsl import build_graph
+
+
+@pytest.fixture
+def graph_fixture() -> Graph:
+    return build_graph(
+        {
+            "nodes": [
+                {"id": "A", "kind": "symbol", "state": "pending"},
+                {"id": "B", "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [
+                {"source": "A", "target": "B", "kind": "calls"},
+            ],
+        }
+    )
+
+
+def test_neighborhood_does_not_mutate(graph_fixture: Graph) -> None:
+    graph = graph_fixture
+    store = GraphStore(graph)
+
+    before_nodes = set(graph.nodes)
+    before_edges = set(graph.edges)
+
+    store.get_neighborhood(next(iter(graph.nodes)), radius=2)
+
+    assert set(graph.nodes) == before_nodes
+    assert set(graph.edges) == before_edges
+
+
+def test_expand_from_node_grows_graph(graph_fixture: Graph) -> None:
+    graph = graph_fixture
+
+    initial_nodes = set(graph.nodes)
+
+    result = expand_from_node(next(iter(graph.nodes)), graph, depth=2)
+
+    assert len(graph.nodes) >= len(initial_nodes)
+    assert isinstance(result, set)
+</file>
+
+<file path="tests/test_graph_store.py">
+import pytest
+
+from iterative_context.graph_models import Graph, GraphEdge
+from iterative_context.injest.llm_tldr_adapter import ingest_repo
+from iterative_context.normalize import raw_tree_to_graph
+from iterative_context.raw_tree import RawTree
+from iterative_context.store import GraphStore
+from iterative_context.test_helpers.repos import get_repo
+
+
+@pytest.fixture(params=["small", "medium"])
+def store_fixture(request: pytest.FixtureRequest) -> tuple[str, RawTree, Graph, GraphStore]:
+    name = request.param
+    path = get_repo(name)
+    tree = ingest_repo(path)
+    graph = raw_tree_to_graph(tree)
+    return name, tree, graph, GraphStore(graph)
+
+
+def test_store_indexes_all_nodes(store_fixture: tuple[str, RawTree, Graph, GraphStore]) -> None:
+    _, _, graph, store = store_fixture
+
+    assert set(store.nodes_by_id) == set(graph.nodes)
+
+
+def test_find_symbol_returns_function_ids(
+    store_fixture: tuple[str, RawTree, Graph, GraphStore],
+) -> None:
+    name, tree, _, store = store_fixture
+
+    fn = next((f.functions[0] for f in tree.files if f.functions), None)
+    assert fn is not None, f"{name} repo has no functions"
+
+    matches = store.find_symbol(fn.name)
+
+    assert fn.id in matches
+
+
+def test_neighbors_match_graph(store_fixture: tuple[str, RawTree, Graph, GraphStore]) -> None:
+    _, _, graph, store = store_fixture
+
+    for node_obj in graph.nodes:
+        node = str(node_obj)
+        expected: set[str] = set()
+        for src_obj, dst_obj in graph.edges:
+            src = str(src_obj)
+            dst = str(dst_obj)
+            if src == node:
+                expected.add(dst)
+            if dst == node:
+                expected.add(src)
+
+        neighbors: set[str] = set(store.get_neighbors(node))
+        assert neighbors == expected
+
+
+def test_neighborhood_radius_one(store_fixture: tuple[str, RawTree, Graph, GraphStore]) -> None:
+    name, tree, _, store = store_fixture
+
+    fn = next((f.functions[0] for f in tree.files if f.functions), None)
+    assert fn is not None, f"{name} repo has no functions"
+
+    expected: set[str] = set(store.get_neighbors(fn.id))
+    expected.add(fn.id)
+
+    assert store.get_neighborhood(fn.id, radius=1) == expected
+
+
+def test_store_is_deterministic(store_fixture: tuple[str, RawTree, Graph, GraphStore]) -> None:
+    _, _, graph, _ = store_fixture
+
+    store_one = GraphStore(graph)
+    store_two = GraphStore(graph)
+
+    assert store_one.nodes_by_id == store_two.nodes_by_id
+    assert store_one.nodes_by_symbol == store_two.nodes_by_symbol
+    assert store_one.nodes_by_file == store_two.nodes_by_file
+
+    def edge_signature(
+        mapping: dict[str, list[GraphEdge]],
+    ) -> list[tuple[str, str, str, str | None]]:
+        sig: list[tuple[str, str, str, str | None]] = []
+        for key in sorted(mapping):
+            sig.extend((key, e.source, e.target, e.kind) for e in mapping[key])
+        return sig
+
+    assert edge_signature(store_one.out_edges) == edge_signature(store_two.out_edges)
+    assert edge_signature(store_one.in_edges) == edge_signature(store_two.in_edges)
+</file>
+
 <file path=".hypothesis/constants/0da054f76284442d">
 # file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/repos.py
 # hypothesis_version: 6.151.9
 
 ['medium', 'small']
+</file>
+
+<file path=".hypothesis/constants/13b75172fffe16dc">
+# file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
+# hypothesis_version: 6.151.9
+
+['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'UpdateNodeEvent', 'create_event_subject']
 </file>
 
 <file path=".hypothesis/constants/383f9c924987eaf1">
@@ -181,11 +547,39 @@ This section contains the contents of the repository's files.
 ['call', 'calls', 'function', 'import', 'imports', 'module']
 </file>
 
+<file path=".hypothesis/constants/3e760b36791142ee">
+# file: /home/becker/projects/iterative-context/.venv/bin/pytest
+# hypothesis_version: 6.151.9
+
+['-script.pyw', '.exe', '__main__']
+</file>
+
+<file path=".hypothesis/constants/4acb6b6a49aa6a45">
+# file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/__init__.py
+# hypothesis_version: 6.151.9
+
+['EventSpec', 'GraphSnapshot', 'GraphSpec', 'GraphType', 'apply_events', 'build_graph', 'debug_run', 'graphs_equal', 'normalize_graph', 'render_steps', 'run_expansion_steps', 'select_first_node']
+</file>
+
+<file path=".hypothesis/constants/4b3f3fce4bc17216">
+# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'id', 'pending', 'run_traversal', 'score_node', 'select_next_node', 'state', 'tokens']
+</file>
+
 <file path=".hypothesis/constants/50bef6a5bf7dc535">
 # file: /home/becker/projects/iterative-context/src/iterative_context/injest/llm_tldr_adapter.py
 # hypothesis_version: 6.151.9
 
 ['*.py', '.venv', '__pycache__', 'functions', 'imports', 'module', 'name', 'python']
+</file>
+
+<file path=".hypothesis/constants/5171b2e4fc2d1118">
+# file: /home/becker/projects/iterative-context/src/iterative_context/scoring_eval.py
+# hypothesis_version: 6.151.9
+
+['compare_scorings', 'run_with_scoring', 'score_v1']
 </file>
 
 <file path=".hypothesis/constants/57fb4c8ec47cd154">
@@ -195,11 +589,53 @@ This section contains the contents of the repository's files.
 ['*.py', '.venv', '__pycache__', 'call', 'called_functions', 'calls', 'functions', 'import', 'imports', 'module', 'name', 'python']
 </file>
 
+<file path=".hypothesis/constants/58d3fceec14484db">
+# file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/snapshot_graph.py
+# hypothesis_version: 6.151.9
+
+['GraphSnapshot', 'addEdges', 'addNodes', 'data', 'edge', 'edges', 'event', 'events', 'evidence', 'file', 'graph', 'id', 'iteration', 'kind', 'node', 'nodes', 'normalize_edge', 'normalize_event', 'normalize_graph', 'normalize_node', 'patch', 'primary', 'render_steps', 'snippet', 'source', 'startLine', 'state', 'step', 'target', 'to_event_dict', 'tokens', 'type', 'updateNode']
+</file>
+
 <file path=".hypothesis/constants/7023e2ba4fce5ddc">
 # file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/repos.py
 # hypothesis_version: 6.151.9
 
 ['medium', 'small']
+</file>
+
+<file path=".hypothesis/constants/7f9e3eeea6979006">
+# file: /home/becker/projects/iterative-context/src/iterative_context/expansion.py
+# hypothesis_version: 6.151.9
+
+['calls', 'expand_node', 'id', 'resolved', 'state', 'symbol', 'tokens']
+</file>
+
+<file path=".hypothesis/constants/85d613f1ebc3ccc9">
+# file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
+# hypothesis_version: 6.151.9
+
+['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'ExpansionPolicy', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'UpdateNodeEvent', 'create_event_subject', 'get_frontier', 'run_traversal', 'score_node', 'select_next_node']
+</file>
+
+<file path=".hypothesis/constants/9d2294939eab0a40">
+# file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/graph_dsl.py
+# hypothesis_version: 6.151.9
+
+['Edge spec', 'EventSpec', 'GraphEvent', 'GraphSpec', 'GraphType', 'Node spec', 'addEdges', 'addNodes', 'anchor', 'apply_events', 'build_graph', 'calls', 'data', 'edges', 'event', 'event_count', 'evidence', 'file', 'final_graph', 'function', 'graph', 'id', 'imports', 'iteration', 'kind', 'label', 'nodes', 'patch', 'pending', 'primary', 'pruned', 'references', 'resolved', 'source', 'state', 'step', 'symbol', 'target', 'tokens', 'type', 'updateNode']
+</file>
+
+<file path=".hypothesis/constants/a3db2a2929b77630">
+# file: /home/becker/projects/iterative-context/src/iterative_context/expansion.py
+# hypothesis_version: 6.151.9
+
+['calls', 'expand_node', 'id', 'resolved', 'state', 'symbol', 'tokens']
+</file>
+
+<file path=".hypothesis/constants/a88ac43e57452995">
+# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'ScoreFn', 'anchor', 'data', 'get_frontier', 'id', 'pending', 'run_traversal', 'score_node', 'select_next_node', 'state', 'tokens']
 </file>
 
 <file path=".hypothesis/constants/c5498bdbc490567f">
@@ -216,11 +652,53 @@ This section contains the contents of the repository's files.
 ['*.py', '.venv', '__pycache__', 'functions', 'module', 'name', 'python']
 </file>
 
+<file path=".hypothesis/constants/d481fb3784aff943">
+# file: /home/becker/projects/iterative-context/src/iterative_context/scoring.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 1000, 'anchor', 'pending', 'score_degree', 'score_random', 'score_v1', 'tokens']
+</file>
+
+<file path=".hypothesis/constants/d4882342917c3538">
+# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'ScoreFn', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
+</file>
+
 <file path=".hypothesis/constants/e2ba7639c97a97c8">
 # file: /home/becker/projects/iterative-context/src/iterative_context/raw_tree.py
 # hypothesis_version: 6.151.9
 
 []
+</file>
+
+<file path=".hypothesis/constants/e6be1952a79f71bb">
+# file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/graph_dsl.py
+# hypothesis_version: 6.151.9
+
+['Edge spec', 'EventSpec', 'GraphEvent', 'GraphSpec', 'GraphType', 'Node spec', 'addEdges', 'addNodes', 'anchor', 'apply_events', 'build_graph', 'calls', 'data', 'edges', 'event', 'event_count', 'evidence', 'file', 'final_graph', 'function', 'graph', 'id', 'imports', 'iteration', 'kind', 'label', 'nodes', 'patch', 'pending', 'primary', 'pruned', 'references', 'resolved', 'source', 'state', 'step', 'symbol', 'target', 'tokens', 'type', 'updateNode']
+</file>
+
+<file path=".hypothesis/constants/eb4760634d19d75f">
+# file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
+# hypothesis_version: 6.151.9
+
+['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'ExpansionPolicy', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'ScoreFn', 'UpdateNodeEvent', 'compare_scorings', 'create_event_subject', 'get_frontier', 'run_traversal', 'run_with_scoring', 'score_degree', 'score_node', 'score_random', 'score_v1', 'select_next_node']
+</file>
+
+<file path=".hypothesis/constants/ed75a52dd5586707">
+# file: /home/becker/projects/iterative-context/src/iterative_context/graph_models.py
+# hypothesis_version: 6.151.9
+
+['Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'addEdges', 'addNodes', 'anchor', 'calls', 'create_event_subject', 'file', 'function', 'imports', 'iteration', 'pending', 'pruned', 'references', 'resolved', 'state', 'symbol', 'type', 'updateNode']
+</file>
+
+<file path=".hypothesis/constants/f24a24344fb8325a">
+# file: /home/becker/projects/iterative-context/src/iterative_context/scoring_eval.py
+# hypothesis_version: 6.151.9
+
+['compare_scorings', 'final_graph', 'graph_steps', 'run_with_scoring', 'score_history', 'score_v1', 'scores', 'steps']
 </file>
 
 <file path="notes/llm-tldr/todo_phases.md">
@@ -744,527 +1222,6 @@ If you want next, I can:
 👉 or sketch the **expand() algorithm using your traversal primitives**
 
 All three would accelerate you hard.
-</file>
-
-<file path="src/iterative_context/injest/llm_tldr_adapter.py">
-from collections.abc import Mapping
-from pathlib import Path
-from typing import cast
-
-from tldr import extract_file  # type: ignore[reportMissingTypeStubs]
-from tldr.api import get_imports  # type: ignore[reportMissingTypeStubs]
-from tldr.ast_extractor import (  # type: ignore[reportMissingTypeStubs]
-    FunctionInfo,
-    ImportInfo,
-    ModuleInfo,
-)
-
-from iterative_context.raw_tree import RawEdge, RawFile, RawFunction, RawTree
-
-Extracted = ModuleInfo | Mapping[str, object]
-FunctionLike = FunctionInfo | Mapping[str, object]
-ImportLike = ImportInfo | Mapping[str, object]
-
-
-def _iter_functions(extracted: Extracted) -> list[FunctionLike]:
-    """Handle both dict and object outputs from llm-tldr."""
-    if isinstance(extracted, ModuleInfo):
-        return list(extracted.functions or [])
-
-    functions_value = extracted.get("functions", [])
-    if isinstance(functions_value, list):
-        return list(cast(list[FunctionLike], functions_value))
-
-    return []
-
-
-def _iter_imports(source: ModuleInfo | Mapping[str, object] | list[ImportLike]) -> list[ImportLike]:
-    """Handle both dict, object, and list outputs from llm-tldr."""
-    if isinstance(source, ModuleInfo):
-        return list(source.imports or [])
-
-    if isinstance(source, list):
-        return list(source)
-
-    imports_value = source.get("imports", [])
-    if isinstance(imports_value, list):
-        return list(cast(list[ImportLike], imports_value))
-
-    return []
-
-
-def _iter_calls(fn: FunctionLike) -> list[str]:
-    """Extract called function names when present."""
-    calls: list[str] = []
-
-    if isinstance(fn, FunctionInfo):
-        maybe_calls = getattr(fn, "calls", None)
-        if isinstance(maybe_calls, list):
-            for call_name in cast(list[object], maybe_calls):
-                if isinstance(call_name, str):
-                    calls.append(call_name)
-
-        maybe_called_functions = getattr(fn, "called_functions", None)
-        if isinstance(maybe_called_functions, list):
-            for call_name in cast(list[object], maybe_called_functions):
-                if isinstance(call_name, str):
-                    calls.append(call_name)
-
-    else:
-        fn_mapping = fn
-        for key in ("calls", "called_functions"):
-            maybe_values = fn_mapping.get(key)
-            if isinstance(maybe_values, list):
-                for call_name in cast(list[object], maybe_values):
-                    if isinstance(call_name, str):
-                        calls.append(call_name)
-
-    return calls
-
-
-def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
-    files: list[RawFile] = []
-
-    for py_file in root.rglob("*.py"):
-        if ".venv" in str(py_file) or "__pycache__" in str(py_file):
-            continue
-
-        try:
-            extracted: Extracted = extract_file(str(py_file))  # type: ignore[assignment]
-        except Exception:
-            continue
-
-        functions: list[RawFunction] = []
-        edges: list[RawEdge] = []
-        for fn in _iter_functions(extracted):
-            name: str | None = fn.name if isinstance(fn, FunctionInfo) else None
-            if name is None and isinstance(fn, Mapping):
-                potential_name = fn.get("name")
-                if isinstance(potential_name, str):
-                    name = potential_name
-
-            if not isinstance(name, str) or not name:
-                continue
-
-            qualified_name = f"{py_file}:{name}"
-
-            functions.append(
-                RawFunction(
-                    id=qualified_name,
-                    name=name,
-                    file=str(py_file),
-                )
-            )
-
-            for called in _iter_calls(fn):
-                edges.append(
-                    RawEdge(
-                        source=qualified_name,
-                        target=called,
-                        kind="call",
-                    )
-                )
-
-        try:
-            imports_raw = cast(
-                list[ImportLike], get_imports(str(py_file), language="python")
-            )
-        except Exception:
-            imports_raw = []
-        else:
-            imports_raw = list(imports_raw)
-
-        imports: list[str] = []
-        for imp in _iter_imports(imports_raw):
-            module: str | None = imp.module if isinstance(imp, ImportInfo) else None
-            if module is None and isinstance(imp, Mapping):
-                potential_module = imp.get("module")
-                if isinstance(potential_module, str):
-                    module = potential_module
-            if isinstance(module, str) and module:
-                imports.append(module)
-                edges.append(
-                    RawEdge(
-                        source=str(py_file),
-                        target=module,
-                        kind="import",
-                    )
-                )
-
-        files.append(
-            RawFile(
-                path=str(py_file),
-                functions=functions,
-                imports=imports,
-                edges=edges,
-            )
-        )
-
-    return RawTree(files=files)
-</file>
-
-<file path="src/iterative_context/test_helpers/repos.py">
-# src/iterative_context/test_helpers/repos.py
-
-import os
-from collections.abc import Iterator
-from pathlib import Path
-
-
-def get_repo(name: str) -> Path:
-    env_var = f"TEST_REPO_{name.upper()}"
-    path = os.environ.get(env_var)
-
-    if not path:
-        raise RuntimeError(f"{env_var} not set")
-
-    p = Path(path)
-    if not p.exists():
-        raise RuntimeError(f"{env_var} path does not exist: {p}")
-
-    return p
-
-
-def iter_repos() -> Iterator[tuple[str, Path]]:
-    for name in ["small", "medium"]:
-        yield name, get_repo(name)
-</file>
-
-<file path="src/iterative_context/normalize.py">
-from iterative_context.graph_models import Graph
-from iterative_context.raw_tree import RawTree
-
-
-def raw_tree_to_graph(tree: RawTree) -> Graph:
-    """Create a minimal graph from a RawTree."""
-    graph = Graph()
-
-    for raw_file in tree.files:
-        for fn in raw_file.functions:
-            graph.add_node(fn.id, type="function", file=fn.file)
-
-    for raw_file in tree.files:
-        for edge in raw_file.edges:
-            if edge.kind == "import":
-                graph.add_node(edge.target, type="module")
-                graph.add_edge(edge.source, edge.target, kind="imports")
-            elif edge.kind == "call":
-                if edge.target in graph.nodes:
-                    graph.add_edge(edge.source, edge.target, kind="calls")
-
-    return graph
-</file>
-
-<file path="src/iterative_context/raw_tree.py">
-from pydantic import BaseModel
-
-
-class RawFunction(BaseModel):
-    id: str
-    name: str
-    file: str
-
-
-class RawEdge(BaseModel):
-    source: str  # function id OR file path
-    target: str  # symbol/module/function name
-    kind: str  # "import" | "call"
-
-
-class RawFile(BaseModel):
-    path: str
-    functions: list[RawFunction]
-    imports: list[str]
-    edges: list[RawEdge]
-
-
-class RawTree(BaseModel):
-    files: list[RawFile]
-</file>
-
-<file path="tests/test_ingest_llm_tldr.py">
-from pathlib import Path
-
-import pytest
-
-from iterative_context.test_helpers.repos import get_repo
-
-
-@pytest.fixture(params=["small", "medium"])
-def repo(request: pytest.FixtureRequest) -> tuple[str, Path]:
-    name = request.param
-    return name, get_repo(name)
-
-
-def test_repo_fixture_exists(repo: tuple[str, Path]) -> None:
-    """Ensure fixture repos are wired correctly and exist on disk."""
-    name, path = repo
-
-    assert path is not None, f"{name} repo path is None"
-    assert path.exists(), f"{name} repo path does not exist: {path}"
-    assert path.is_dir(), f"{name} repo path is not a directory: {path}"
-
-
-def test_repo_has_pyproject(repo: tuple[str, Path]) -> None:
-    """Ensure repos look like real Python projects (minimal sanity check)."""
-    name, path = repo
-
-    pyproject = path / "pyproject.toml"
-
-    assert pyproject.exists(), (
-        f"{name} repo missing pyproject.toml — not a valid test target: {path}"
-    )
-</file>
-
-<file path="tests/test_llm_tldr_normalization.py">
-from pathlib import Path
-
-import pytest
-
-from iterative_context.injest.llm_tldr_adapter import ingest_repo
-from iterative_context.normalize import raw_tree_to_graph
-from iterative_context.raw_tree import RawTree
-from iterative_context.test_helpers.repos import get_repo
-
-
-@pytest.fixture(params=["small", "medium"])
-def repo(request: pytest.FixtureRequest) -> tuple[str, Path]:
-    name = request.param
-    return name, get_repo(name)
-
-
-def normalize_raw_tree(tree: RawTree) -> dict[str, int]:
-    """Flatten RawTree into simple aggregate counts for early normalization."""
-    counts: dict[str, int] = {"files": 0, "functions": 0, "imports": 0}
-
-    for raw_file in tree.files:
-        counts["files"] += 1
-        counts["functions"] += len(raw_file.functions)
-        counts["imports"] += len(raw_file.imports)
-
-    return counts
-
-
-def test_ingest_produces_files(repo: tuple[str, Path]) -> None:
-    name, path = repo
-
-    tree = ingest_repo(path)
-
-    assert tree.files, f"{name} repo ingestion produced no files: {path}"
-    assert any(
-        raw_file.functions or raw_file.imports for raw_file in tree.files
-    ), f"{name} repo ingestion missing functions/imports: {path}"
-
-
-def test_functions_have_ids(repo: tuple[str, Path]) -> None:
-    name, path = repo
-
-    tree = ingest_repo(path)
-
-    for raw_file in tree.files:
-        for fn in raw_file.functions:
-            assert fn.id, f"{name} function missing id in {raw_file.path}"
-            assert fn.name, f"{name} function missing name in {raw_file.path}"
-            assert Path(fn.file).exists(), f"{name} function file missing: {fn.file}"
-
-
-def test_imports_are_strings(repo: tuple[str, Path]) -> None:
-    name, path = repo
-
-    tree = ingest_repo(path)
-
-    for raw_file in tree.files:
-        for imp in raw_file.imports:
-            assert isinstance(imp, str), f"{name} import is not a string: {imp}"
-            assert imp, f"{name} import is empty in file {raw_file.path}"
-
-
-def test_normalization_is_deterministic(repo: tuple[str, Path]) -> None:
-    _, path = repo
-
-    tree1 = ingest_repo(path)
-    tree2 = ingest_repo(path)
-
-    norm1 = normalize_raw_tree(tree1)
-    norm2 = normalize_raw_tree(tree2)
-
-    assert norm1 == norm2
-
-
-def test_normalization_has_reasonable_size(repo: tuple[str, Path]) -> None:
-    name, path = repo
-
-    tree = ingest_repo(path)
-    norm = normalize_raw_tree(tree)
-
-    assert norm["files"] > 0, f"{name} normalization has zero files"
-    assert norm["functions"] >= 0, f"{name} normalization has negative functions"
-    assert norm["imports"] >= 0, f"{name} normalization has negative imports"
-
-    assert norm["functions"] < 50_000, f"{name} normalization too many functions"
-    assert norm["imports"] < 50_000, f"{name} normalization too many imports"
-
-
-def test_edges_exist(repo: tuple[str, Path]) -> None:
-    _, path = repo
-
-    tree = ingest_repo(path)
-
-    total_edges = sum(len(f.edges) for f in tree.files)
-
-    assert total_edges > 0, "no edges extracted from repo"
-
-
-def test_import_edges_valid(repo: tuple[str, Path]) -> None:
-    _, path = repo
-
-    tree = ingest_repo(path)
-
-    for raw_file in tree.files:
-        for edge in raw_file.edges:
-            if edge.kind == "import":
-                assert edge.source
-                assert edge.target
-
-
-def test_graph_has_edges(repo: tuple[str, Path]) -> None:
-    _, path = repo
-
-    tree = ingest_repo(path)
-    graph = raw_tree_to_graph(tree)
-
-    assert len(graph.edges) > 0
-
-
-def test_edges_deterministic(repo: tuple[str, Path]) -> None:
-    _, path = repo
-
-    t1 = ingest_repo(path)
-    t2 = ingest_repo(path)
-
-    e1 = [(e.source, e.target, e.kind) for f in t1.files for e in f.edges]
-    e2 = [(e.source, e.target, e.kind) for f in t2.files for e in f.edges]
-
-    assert sorted(e1) == sorted(e2)
-</file>
-
-<file path=".hypothesis/constants/13b75172fffe16dc">
-# file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
-# hypothesis_version: 6.151.9
-
-['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'UpdateNodeEvent', 'create_event_subject']
-</file>
-
-<file path=".hypothesis/constants/3e760b36791142ee">
-# file: /home/becker/projects/iterative-context/.venv/bin/pytest
-# hypothesis_version: 6.151.9
-
-['-script.pyw', '.exe', '__main__']
-</file>
-
-<file path=".hypothesis/constants/4acb6b6a49aa6a45">
-# file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/__init__.py
-# hypothesis_version: 6.151.9
-
-['EventSpec', 'GraphSnapshot', 'GraphSpec', 'GraphType', 'apply_events', 'build_graph', 'debug_run', 'graphs_equal', 'normalize_graph', 'render_steps', 'run_expansion_steps', 'select_first_node']
-</file>
-
-<file path=".hypothesis/constants/4b3f3fce4bc17216">
-# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'id', 'pending', 'run_traversal', 'score_node', 'select_next_node', 'state', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/5171b2e4fc2d1118">
-# file: /home/becker/projects/iterative-context/src/iterative_context/scoring_eval.py
-# hypothesis_version: 6.151.9
-
-['compare_scorings', 'run_with_scoring', 'score_v1']
-</file>
-
-<file path=".hypothesis/constants/58d3fceec14484db">
-# file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/snapshot_graph.py
-# hypothesis_version: 6.151.9
-
-['GraphSnapshot', 'addEdges', 'addNodes', 'data', 'edge', 'edges', 'event', 'events', 'evidence', 'file', 'graph', 'id', 'iteration', 'kind', 'node', 'nodes', 'normalize_edge', 'normalize_event', 'normalize_graph', 'normalize_node', 'patch', 'primary', 'render_steps', 'snippet', 'source', 'startLine', 'state', 'step', 'target', 'to_event_dict', 'tokens', 'type', 'updateNode']
-</file>
-
-<file path=".hypothesis/constants/7f9e3eeea6979006">
-# file: /home/becker/projects/iterative-context/src/iterative_context/expansion.py
-# hypothesis_version: 6.151.9
-
-['calls', 'expand_node', 'id', 'resolved', 'state', 'symbol', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/85d613f1ebc3ccc9">
-# file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
-# hypothesis_version: 6.151.9
-
-['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'ExpansionPolicy', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'UpdateNodeEvent', 'create_event_subject', 'get_frontier', 'run_traversal', 'score_node', 'select_next_node']
-</file>
-
-<file path=".hypothesis/constants/9d2294939eab0a40">
-# file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/graph_dsl.py
-# hypothesis_version: 6.151.9
-
-['Edge spec', 'EventSpec', 'GraphEvent', 'GraphSpec', 'GraphType', 'Node spec', 'addEdges', 'addNodes', 'anchor', 'apply_events', 'build_graph', 'calls', 'data', 'edges', 'event', 'event_count', 'evidence', 'file', 'final_graph', 'function', 'graph', 'id', 'imports', 'iteration', 'kind', 'label', 'nodes', 'patch', 'pending', 'primary', 'pruned', 'references', 'resolved', 'source', 'state', 'step', 'symbol', 'target', 'tokens', 'type', 'updateNode']
-</file>
-
-<file path=".hypothesis/constants/a3db2a2929b77630">
-# file: /home/becker/projects/iterative-context/src/iterative_context/expansion.py
-# hypothesis_version: 6.151.9
-
-['calls', 'expand_node', 'id', 'resolved', 'state', 'symbol', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/a88ac43e57452995">
-# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'ScoreFn', 'anchor', 'data', 'get_frontier', 'id', 'pending', 'run_traversal', 'score_node', 'select_next_node', 'state', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/d481fb3784aff943">
-# file: /home/becker/projects/iterative-context/src/iterative_context/scoring.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.5, 5.0, 10.0, 1000, 'anchor', 'pending', 'score_degree', 'score_random', 'score_v1', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/d4882342917c3538">
-# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'ScoreFn', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/e6be1952a79f71bb">
-# file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/graph_dsl.py
-# hypothesis_version: 6.151.9
-
-['Edge spec', 'EventSpec', 'GraphEvent', 'GraphSpec', 'GraphType', 'Node spec', 'addEdges', 'addNodes', 'anchor', 'apply_events', 'build_graph', 'calls', 'data', 'edges', 'event', 'event_count', 'evidence', 'file', 'final_graph', 'function', 'graph', 'id', 'imports', 'iteration', 'kind', 'label', 'nodes', 'patch', 'pending', 'primary', 'pruned', 'references', 'resolved', 'source', 'state', 'step', 'symbol', 'target', 'tokens', 'type', 'updateNode']
-</file>
-
-<file path=".hypothesis/constants/eb4760634d19d75f">
-# file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
-# hypothesis_version: 6.151.9
-
-['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'ExpansionPolicy', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'ScoreFn', 'UpdateNodeEvent', 'compare_scorings', 'create_event_subject', 'get_frontier', 'run_traversal', 'run_with_scoring', 'score_degree', 'score_node', 'score_random', 'score_v1', 'select_next_node']
-</file>
-
-<file path=".hypothesis/constants/ed75a52dd5586707">
-# file: /home/becker/projects/iterative-context/src/iterative_context/graph_models.py
-# hypothesis_version: 6.151.9
-
-['Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'addEdges', 'addNodes', 'anchor', 'calls', 'create_event_subject', 'file', 'function', 'imports', 'iteration', 'pending', 'pruned', 'references', 'resolved', 'state', 'symbol', 'type', 'updateNode']
-</file>
-
-<file path=".hypothesis/constants/f24a24344fb8325a">
-# file: /home/becker/projects/iterative-context/src/iterative_context/scoring_eval.py
-# hypothesis_version: 6.151.9
-
-['compare_scorings', 'final_graph', 'graph_steps', 'run_with_scoring', 'score_history', 'score_v1', 'scores', 'steps']
 </file>
 
 <file path="notes/tests_and_invariants/metamorphic/tests_to_impl.md">
@@ -4708,6 +4665,301 @@ If you want next, I can:
 But this plan is solid and ready to execute.
 </file>
 
+<file path="src/iterative_context/injest/llm_tldr_adapter.py">
+from collections.abc import Mapping
+from pathlib import Path
+from typing import cast
+
+from tldr import extract_file  # type: ignore[reportMissingTypeStubs]
+from tldr.api import get_imports  # type: ignore[reportMissingTypeStubs]
+from tldr.ast_extractor import (  # type: ignore[reportMissingTypeStubs]
+    FunctionInfo,
+    ImportInfo,
+    ModuleInfo,
+)
+
+from iterative_context.raw_tree import RawEdge, RawFile, RawFunction, RawTree
+
+Extracted = ModuleInfo | Mapping[str, object]
+FunctionLike = FunctionInfo | Mapping[str, object]
+ImportLike = ImportInfo | Mapping[str, object]
+
+
+def _iter_functions(extracted: Extracted) -> list[FunctionLike]:
+    """Handle both dict and object outputs from llm-tldr."""
+    if isinstance(extracted, ModuleInfo):
+        return list(extracted.functions or [])
+
+    functions_value = extracted.get("functions", [])
+    if isinstance(functions_value, list):
+        return list(cast(list[FunctionLike], functions_value))
+
+    return []
+
+
+def _iter_imports(source: ModuleInfo | Mapping[str, object] | list[ImportLike]) -> list[ImportLike]:
+    """Handle both dict, object, and list outputs from llm-tldr."""
+    if isinstance(source, ModuleInfo):
+        return list(source.imports or [])
+
+    if isinstance(source, list):
+        return list(source)
+
+    imports_value = source.get("imports", [])
+    if isinstance(imports_value, list):
+        return list(cast(list[ImportLike], imports_value))
+
+    return []
+
+
+def _iter_calls(fn: FunctionLike) -> list[str]:
+    """Extract called function names when present."""
+    calls: list[str] = []
+
+    if isinstance(fn, FunctionInfo):
+        maybe_calls = getattr(fn, "calls", None)
+        if isinstance(maybe_calls, list):
+            for call_name in cast(list[object], maybe_calls):
+                if isinstance(call_name, str):
+                    calls.append(call_name)
+
+        maybe_called_functions = getattr(fn, "called_functions", None)
+        if isinstance(maybe_called_functions, list):
+            for call_name in cast(list[object], maybe_called_functions):
+                if isinstance(call_name, str):
+                    calls.append(call_name)
+
+    else:
+        fn_mapping = fn
+        for key in ("calls", "called_functions"):
+            maybe_values = fn_mapping.get(key)
+            if isinstance(maybe_values, list):
+                for call_name in cast(list[object], maybe_values):
+                    if isinstance(call_name, str):
+                        calls.append(call_name)
+
+    return calls
+
+
+def _iter_call_graph_edges(module: Extracted) -> list[tuple[str, str]]:  # noqa: PLR0912
+    """Extract call edges from module-level call graph when available."""
+    edges: list[tuple[str, str]] = []
+
+    if isinstance(module, ModuleInfo):
+        call_graph = getattr(module, "call_graph", None)
+        call_map = getattr(call_graph, "calls", None) if call_graph else None
+        if isinstance(call_map, dict):
+            typed_call_map = cast(dict[str, object], call_map)
+            for src, targets in typed_call_map.items():
+                if not isinstance(targets, list):
+                    continue
+                for target in cast(list[object], targets):
+                    if isinstance(target, str):
+                        edges.append((src, target))
+    else:
+        call_graph = cast(Mapping[str, object] | None, module.get("call_graph"))
+        if call_graph:
+            call_map = call_graph.get("calls")
+            if isinstance(call_map, Mapping):
+                typed_call_map = cast(Mapping[str, object], call_map)
+                for src, targets in typed_call_map.items():
+                    if not isinstance(targets, list):
+                        continue
+                    for target in cast(list[object], targets):
+                        if isinstance(target, str):
+                            edges.append((src, target))
+
+    return edges
+
+
+def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
+    files: list[RawFile] = []
+
+    for py_file in root.rglob("*.py"):
+        if ".venv" in str(py_file) or "__pycache__" in str(py_file):
+            continue
+
+        try:
+            extracted: Extracted = extract_file(str(py_file))  # type: ignore[assignment]
+        except Exception:
+            continue
+
+        functions: list[RawFunction] = []
+        edges: list[RawEdge] = []
+        for fn in _iter_functions(extracted):
+            name: str | None = fn.name if isinstance(fn, FunctionInfo) else None
+            if name is None and isinstance(fn, Mapping):
+                potential_name = fn.get("name")
+                if isinstance(potential_name, str):
+                    name = potential_name
+
+            if not isinstance(name, str) or not name:
+                continue
+
+            qualified_name = f"{py_file}:{name}"
+
+            functions.append(
+                RawFunction(
+                    id=qualified_name,
+                    name=name,
+                    file=str(py_file),
+                )
+            )
+
+            for called in _iter_calls(fn):
+                edges.append(
+                    RawEdge(
+                        source=qualified_name,
+                        target=called,
+                        kind="call",
+                    )
+                )
+
+        for src, target in _iter_call_graph_edges(extracted):
+            edges.append(
+                RawEdge(
+                    source=f"{py_file}:{src}",
+                    target=target,
+                    kind="call",
+                )
+            )
+
+        try:
+            imports_raw = cast(
+                list[ImportLike], get_imports(str(py_file), language="python")
+            )
+        except Exception:
+            imports_raw = []
+        else:
+            imports_raw = list(imports_raw)
+
+        imports: list[str] = []
+        for imp in _iter_imports(imports_raw):
+            module: str | None = imp.module if isinstance(imp, ImportInfo) else None
+            if module is None and isinstance(imp, Mapping):
+                potential_module = imp.get("module")
+                if isinstance(potential_module, str):
+                    module = potential_module
+            if isinstance(module, str) and module:
+                imports.append(module)
+                edges.append(
+                    RawEdge(
+                        source=str(py_file),
+                        target=module,
+                        kind="import",
+                    )
+                )
+
+        files.append(
+            RawFile(
+                path=str(py_file),
+                functions=functions,
+                imports=imports,
+                edges=edges,
+            )
+        )
+
+    return RawTree(files=files)
+</file>
+
+<file path="src/iterative_context/test_helpers/repos.py">
+# src/iterative_context/test_helpers/repos.py
+
+import os
+from collections.abc import Iterator
+from pathlib import Path
+
+
+def get_repo(name: str) -> Path:
+    env_var = f"TEST_REPO_{name.upper()}"
+    path = os.environ.get(env_var)
+
+    if not path:
+        raise RuntimeError(f"{env_var} not set")
+
+    p = Path(path)
+    if not p.exists():
+        raise RuntimeError(f"{env_var} path does not exist: {p}")
+
+    return p
+
+
+def iter_repos() -> Iterator[tuple[str, Path]]:
+    for name in ["small", "medium"]:
+        yield name, get_repo(name)
+</file>
+
+<file path="src/iterative_context/normalize.py">
+from collections.abc import Iterable
+
+from iterative_context.graph_models import Graph
+from iterative_context.raw_tree import RawTree
+
+
+def raw_tree_to_graph(tree: RawTree) -> Graph:
+    """Create a minimal graph from a RawTree."""
+    graph = Graph()
+
+    def ensure_node(node_id: str, *, node_type: str, symbol: str, file: str | None) -> None:
+        if node_id not in graph.nodes:
+            graph.add_node(node_id, type=node_type, symbol=symbol, file=file)
+        else:
+            # Preserve existing attributes but backfill symbol/type/file if missing.
+            data = graph.nodes[node_id]
+            data.setdefault("type", node_type)
+            data.setdefault("symbol", symbol)
+            if file is not None:
+                data.setdefault("file", file)
+
+    for raw_file in sorted(tree.files, key=lambda f: f.path):
+        for fn in raw_file.functions:
+            ensure_node(fn.id, node_type="function", symbol=fn.name, file=fn.file)
+
+    def iter_edges() -> Iterable[tuple[str, str, str, str]]:
+        for raw_file in sorted(tree.files, key=lambda f: f.path):
+            for edge in sorted(raw_file.edges, key=lambda e: (e.kind, e.source, e.target)):
+                yield edge.kind, edge.source, edge.target, raw_file.path
+
+    for kind, source, target, file_path in iter_edges():
+        if kind == "import":
+            ensure_node(source, node_type="unknown", symbol=source, file=file_path)
+            ensure_node(target, node_type="module", symbol=target, file=None)
+            graph.add_edge(source, target, kind="imports")
+        elif kind == "call":
+            ensure_node(source, node_type="unknown", symbol=source, file=file_path)
+            ensure_node(target, node_type="unknown", symbol=target, file=None)
+            graph.add_edge(source, target, kind="calls")
+
+    return graph
+</file>
+
+<file path="src/iterative_context/raw_tree.py">
+from pydantic import BaseModel
+
+
+class RawFunction(BaseModel):
+    id: str
+    name: str
+    file: str
+
+
+class RawEdge(BaseModel):
+    source: str  # function id OR file path
+    target: str  # symbol/module/function name
+    kind: str  # "import" | "call"
+
+
+class RawFile(BaseModel):
+    path: str
+    functions: list[RawFunction]
+    imports: list[str]
+    edges: list[RawEdge]
+
+
+class RawTree(BaseModel):
+    files: list[RawFile]
+</file>
+
 <file path="src/iterative_context/scoring.py">
 # iterative-context/src/iterative_context/scoring.py
 
@@ -5811,6 +6063,210 @@ def test_edge_duplication_stability():
     assert normalize_graph(result_base) == normalize_graph(result_dup)
 </file>
 
+<file path="tests/test_ingest_llm_tldr.py">
+from pathlib import Path
+
+import pytest
+
+from iterative_context.test_helpers.repos import get_repo
+
+
+@pytest.fixture(params=["small", "medium"])
+def repo(request: pytest.FixtureRequest) -> tuple[str, Path]:
+    name = request.param
+    return name, get_repo(name)
+
+
+def test_repo_fixture_exists(repo: tuple[str, Path]) -> None:
+    """Ensure fixture repos are wired correctly and exist on disk."""
+    name, path = repo
+
+    assert path is not None, f"{name} repo path is None"
+    assert path.exists(), f"{name} repo path does not exist: {path}"
+    assert path.is_dir(), f"{name} repo path is not a directory: {path}"
+
+
+def test_repo_has_pyproject(repo: tuple[str, Path]) -> None:
+    """Ensure repos look like real Python projects (minimal sanity check)."""
+    name, path = repo
+
+    pyproject = path / "pyproject.toml"
+
+    assert pyproject.exists(), (
+        f"{name} repo missing pyproject.toml — not a valid test target: {path}"
+    )
+</file>
+
+<file path="tests/test_llm_tldr_normalization.py">
+from pathlib import Path
+
+import pytest
+
+from iterative_context.injest.llm_tldr_adapter import ingest_repo
+from iterative_context.normalize import raw_tree_to_graph
+from iterative_context.raw_tree import RawTree
+from iterative_context.test_helpers.repos import get_repo
+
+
+@pytest.fixture(params=["small", "medium"])
+def repo(request: pytest.FixtureRequest) -> tuple[str, Path]:
+    name = request.param
+    return name, get_repo(name)
+
+
+def normalize_raw_tree(tree: RawTree) -> dict[str, int]:
+    """Flatten RawTree into simple aggregate counts for early normalization."""
+    counts: dict[str, int] = {"files": 0, "functions": 0, "imports": 0}
+
+    for raw_file in tree.files:
+        counts["files"] += 1
+        counts["functions"] += len(raw_file.functions)
+        counts["imports"] += len(raw_file.imports)
+
+    return counts
+
+
+def test_ingest_produces_files(repo: tuple[str, Path]) -> None:
+    name, path = repo
+
+    tree = ingest_repo(path)
+
+    assert tree.files, f"{name} repo ingestion produced no files: {path}"
+    assert any(
+        raw_file.functions or raw_file.imports for raw_file in tree.files
+    ), f"{name} repo ingestion missing functions/imports: {path}"
+
+
+def test_functions_have_ids(repo: tuple[str, Path]) -> None:
+    name, path = repo
+
+    tree = ingest_repo(path)
+
+    for raw_file in tree.files:
+        for fn in raw_file.functions:
+            assert fn.id, f"{name} function missing id in {raw_file.path}"
+            assert fn.name, f"{name} function missing name in {raw_file.path}"
+            assert Path(fn.file).exists(), f"{name} function file missing: {fn.file}"
+
+
+def test_imports_are_strings(repo: tuple[str, Path]) -> None:
+    name, path = repo
+
+    tree = ingest_repo(path)
+
+    for raw_file in tree.files:
+        for imp in raw_file.imports:
+            assert isinstance(imp, str), f"{name} import is not a string: {imp}"
+            assert imp, f"{name} import is empty in file {raw_file.path}"
+
+
+def test_normalization_is_deterministic(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    tree1 = ingest_repo(path)
+    tree2 = ingest_repo(path)
+
+    norm1 = normalize_raw_tree(tree1)
+    norm2 = normalize_raw_tree(tree2)
+
+    assert norm1 == norm2
+
+
+def test_normalization_has_reasonable_size(repo: tuple[str, Path]) -> None:
+    name, path = repo
+
+    tree = ingest_repo(path)
+    norm = normalize_raw_tree(tree)
+
+    assert norm["files"] > 0, f"{name} normalization has zero files"
+    assert norm["functions"] >= 0, f"{name} normalization has negative functions"
+    assert norm["imports"] >= 0, f"{name} normalization has negative imports"
+
+    assert norm["functions"] < 50_000, f"{name} normalization too many functions"
+    assert norm["imports"] < 50_000, f"{name} normalization too many imports"
+
+
+def test_edges_exist(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    tree = ingest_repo(path)
+
+    total_edges = sum(len(f.edges) for f in tree.files)
+
+    assert total_edges > 0, "no edges extracted from repo"
+
+
+def test_import_edges_valid(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    tree = ingest_repo(path)
+
+    for raw_file in tree.files:
+        for edge in raw_file.edges:
+            if edge.kind == "import":
+                assert edge.source
+                assert edge.target
+
+
+def test_graph_has_edges(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    tree = ingest_repo(path)
+    graph = raw_tree_to_graph(tree)
+
+    assert len(graph.edges) > 0
+
+
+def test_edges_deterministic(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    t1 = ingest_repo(path)
+    t2 = ingest_repo(path)
+
+    e1 = [(e.source, e.target, e.kind) for f in t1.files for e in f.edges]
+    e2 = [(e.source, e.target, e.kind) for f in t2.files for e in f.edges]
+
+    assert sorted(e1) == sorted(e2)
+
+
+def test_call_edges_preserved_across_files(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    tree = ingest_repo(path)
+    raw_calls = [
+        (e.source, e.target) for f in tree.files for e in f.edges if e.kind == "call"
+    ]
+
+    graph = raw_tree_to_graph(tree)
+    graph_calls = [
+        (src, dst) for src, dst, data in graph.edges(data=True) if data.get("kind") == "calls"
+    ]
+
+    assert len(graph_calls) == len(raw_calls)
+
+
+def test_unknown_nodes_created(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    tree = ingest_repo(path)
+    graph = raw_tree_to_graph(tree)
+
+    function_ids = {fn.id for raw_file in tree.files for fn in raw_file.functions}
+
+    found_unknown = False
+    for _, dst, data in graph.edges(data=True):
+        if data.get("kind") != "calls":
+            continue
+        if dst not in function_ids:
+            node_data = graph.nodes.get(dst, {})
+            assert node_data, f"call target {dst} missing from graph"
+            assert node_data.get("type") in {"unknown", "module", "function"}
+            if node_data.get("type") == "unknown":
+                found_unknown = True
+
+    assert found_unknown
+</file>
+
 <file path=".gitignore">
 # Python-generated files
 __pycache__/
@@ -5937,157 +6393,6 @@ uv run basedpyright && uv run pytest
 
 nix develop
 uv run basedpyright && uv run pytest
-</file>
-
-<file path="flake.lock">
-{
-  "nodes": {
-    "flake-utils": {
-      "inputs": {
-        "systems": "systems"
-      },
-      "locked": {
-        "lastModified": 1731533236,
-        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "type": "github"
-      }
-    },
-    "medium": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1767163888,
-        "narHash": "sha256-8ypl0P+vS39r6TaZHL4m5V3TTGHX97AQ5NTSKztx008=",
-        "owner": "pallets",
-        "repo": "click",
-        "rev": "cdab890e57a30a9f437b88ce9652f7bfce980c1f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "pallets",
-        "repo": "click",
-        "type": "github"
-      }
-    },
-    "nixpkgs": {
-      "locked": {
-        "lastModified": 1773734432,
-        "narHash": "sha256-IF5ppUWh6gHGHYDbtVUyhwy/i7D261P7fWD1bPefOsw=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "cda48547b432e8d3b18b4180ba07473762ec8558",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "root": {
-      "inputs": {
-        "flake-utils": "flake-utils",
-        "medium": "medium",
-        "nixpkgs": "nixpkgs",
-        "small": "small"
-      }
-    },
-    "small": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1749933342,
-        "narHash": "sha256-5n8WD1A/Bh15iLmOsM1pyB9UTc35NWedLMH4gClxOvE=",
-        "owner": "pallets",
-        "repo": "itsdangerous",
-        "rev": "672971d66a2ef9f85151e53283113f33d642dabd",
-        "type": "github"
-      },
-      "original": {
-        "owner": "pallets",
-        "repo": "itsdangerous",
-        "type": "github"
-      }
-    },
-    "systems": {
-      "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
-      }
-    }
-  },
-  "root": "root",
-  "version": 7
-}
-</file>
-
-<file path="flake.nix">
-{
-  description = "Iterative-context development environment";
-
-  inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-
-    small = {
-      url = "github:pallets/itsdangerous";
-      flake = false;
-    };
-
-    medium = {
-      url = "github:pallets/click";
-      flake = false;
-    };
-  };
-
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-      small,
-      medium,
-    }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs { inherit system; };
-      in
-      {
-        devShells.default = pkgs.mkShell {
-          buildInputs = [
-            pkgs.python3
-            pkgs.uv
-          ];
-
-          shellHook = ''
-            export TEST_REPO_SMALL="${small}"
-            export TEST_REPO_MEDIUM="${medium}"
-
-            echo "Test repos:"
-            echo "  small  -> ${small}"
-            echo "  medium -> ${medium}"
-          '';
-        };
-      }
-    );
-}
 </file>
 
 <file path="pyrightconfig.json">
@@ -6925,6 +7230,19 @@ def expand_node(
     graph: Graph,
 ) -> list[GraphEvent]:
     """
+    MUTATION PRIMITIVE.
+
+    This function produces events that MODIFY the graph.
+
+    It does NOT:
+    - traverse the graph
+    - query neighbors
+    - compute neighborhoods
+
+    It only defines how a single node expands.
+
+    This is intentionally minimal and deterministic.
+
     Produce the deterministic sequence of events that expands ``node_to_expand``.
 
     Parameters
@@ -7728,63 +8046,155 @@ def test_traversal_changes_with_scoring(snapshot_graph: GraphSnapshot):
     snapshot_graph.assert_graph(graph)  # type: ignore[arg-type]
 </file>
 
-<file path="pyproject.toml">
-[project]
-name = "iterative-context"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.14"
-dependencies = [
-    "networkx>=3.0",
-    "pydantic>=2.0",
-    "rx>=3.0",
-    "pytest>=8.0",
-    "pytest-snapshot>=0.9",
-    "rxpy>=0.1.0",
-    "basedpyright>=1.5.0",
-    "ruff>=0.4.0",
-    "hypothesis>=6.151.9",
-    "llm-tldr>=1.5.2",
-]
-packages = [{ include = "iterative_context", from = "src" }]
+<file path="flake.lock">
+{
+  "nodes": {
+    "flake-utils": {
+      "inputs": {
+        "systems": "systems"
+      },
+      "locked": {
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "medium": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1767163888,
+        "narHash": "sha256-8ypl0P+vS39r6TaZHL4m5V3TTGHX97AQ5NTSKztx008=",
+        "owner": "pallets",
+        "repo": "click",
+        "rev": "cdab890e57a30a9f437b88ce9652f7bfce980c1f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pallets",
+        "repo": "click",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1773734432,
+        "narHash": "sha256-IF5ppUWh6gHGHYDbtVUyhwy/i7D261P7fWD1bPefOsw=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "cda48547b432e8d3b18b4180ba07473762ec8558",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "flake-utils": "flake-utils",
+        "medium": "medium",
+        "nixpkgs": "nixpkgs",
+        "small": "small"
+      }
+    },
+    "small": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1749933342,
+        "narHash": "sha256-5n8WD1A/Bh15iLmOsM1pyB9UTc35NWedLMH4gClxOvE=",
+        "owner": "pallets",
+        "repo": "itsdangerous",
+        "rev": "672971d66a2ef9f85151e53283113f33d642dabd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pallets",
+        "repo": "itsdangerous",
+        "type": "github"
+      }
+    },
+    "systems": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
+</file>
 
-[tool.ruff]
-line-length = 100
-target-version = "py314"
+<file path="flake.nix">
+{
+  description = "Iterative-context development environment";
 
-[tool.ruff.lint]
-select = [
-    "E",   # pycodestyle
-    "F",   # pyflakes
-    "B",   # bugbear
-    "I",   # import sorting
-    "UP",  # pyupgrade
-    "C4",  # comprehensions
-    "SIM", # simplifications
-    "PL",  # pylint rules
-]
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
 
-ignore = []
+    small = {
+      url = "github:pallets/itsdangerous";
+      flake = false;
+    };
 
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["PLR2004"]  # allow magic values in tests
+    medium = {
+      url = "github:pallets/click";
+      flake = false;
+    };
+  };
 
-[tool.uv.workspace]
-members = [
-    ".",
-]
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      small,
+      medium,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          buildInputs = [
+            pkgs.python3
+            pkgs.uv
+          ];
 
-[tool.uv.sources]
-iterative-context = { workspace = true }
+          shellHook = ''
+            export TEST_REPO_SMALL="${small}"
+            export TEST_REPO_MEDIUM="${medium}"
 
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-
-[dependency-groups]
-dev = [
-    "iterative-context",
-]
+            echo "Test repos:"
+            echo "  small  -> ${small}"
+            echo "  medium -> ${medium}"
+          '';
+        };
+      }
+    );
+}
 </file>
 
 <file path="src/iterative_context/test_helpers/__init__.py">
@@ -8344,6 +8754,7 @@ from .graph_models import (  # noqa: F401
 )
 from .scoring import score_degree, score_random, score_v1  # noqa: F401
 from .scoring_eval import compare_scorings, run_with_scoring  # noqa: F401
+from .store import GraphStore, debug_summary  # noqa: F401
 from .traversal import (  # noqa: F401
     DefaultExpansionPolicy,
     ExpansionPolicy,
@@ -8381,6 +8792,8 @@ __all__ = [
     "score_random",
     "run_with_scoring",
     "compare_scorings",
+    "GraphStore",
+    "debug_summary",
 ]
 </file>
 
@@ -8707,6 +9120,65 @@ def test_edge_and_events(snapshot_graph: GraphSnapshot, snapshot: Snapshot):
     snapshot_graph.assert_graph(final_graph)  # type: ignore[arg-type]
     rendered_steps = render_steps(steps)
     snapshot.assert_match(rendered_steps, "event_graph_steps")
+</file>
+
+<file path="pyproject.toml">
+[project]
+name = "iterative-context"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "networkx>=3.0",
+    "pydantic>=2.0",
+    "rx>=3.0",
+    "pytest>=8.0",
+    "pytest-snapshot>=0.9",
+    "rxpy>=0.1.0",
+    "basedpyright>=1.5.0",
+    "ruff>=0.4.0",
+    "hypothesis>=6.151.9",
+    "llm-tldr>=1.5.2",
+]
+packages = [{ include = "iterative_context", from = "src" }]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "B",   # bugbear
+    "I",   # import sorting
+    "UP",  # pyupgrade
+    "C4",  # comprehensions
+    "SIM", # simplifications
+    "PL",  # pylint rules
+]
+
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004"]  # allow magic values in tests
+
+[tool.uv.workspace]
+members = [
+    ".",
+]
+
+[tool.uv.sources]
+iterative-context = { workspace = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "iterative-context",
+]
 </file>
 
 </files>

@@ -34,6 +34,19 @@ def expand_node(
     graph: Graph,
 ) -> list[GraphEvent]:
     """
+    MUTATION PRIMITIVE.
+
+    This function produces events that MODIFY the graph.
+
+    It does NOT:
+    - traverse the graph
+    - query neighbors
+    - compute neighborhoods
+
+    It only defines how a single node expands.
+
+    This is intentionally minimal and deterministic.
+
     Produce the deterministic sequence of events that expands ``node_to_expand``.
 
     Parameters
