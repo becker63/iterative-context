@@ -1,6 +1,8 @@
+# pyright: reportPrivateUsage=false
+
 import pytest
 
-from iterative_context.exploration import expand
+from iterative_context.exploration import _set_active_graph, expand
 from iterative_context.graph_models import Graph
 from iterative_context.store import GraphStore
 from iterative_context.test_helpers.graph_dsl import build_graph
@@ -8,7 +10,7 @@ from iterative_context.test_helpers.graph_dsl import build_graph
 
 @pytest.fixture
 def graph_fixture() -> Graph:
-    return build_graph(
+    graph = build_graph(
         {
             "nodes": [
                 {"id": "A", "kind": "symbol", "state": "pending"},
@@ -19,6 +21,8 @@ def graph_fixture() -> Graph:
             ],
         }
     )
+    _set_active_graph(graph)
+    return graph
 
 
 def test_neighborhood_does_not_mutate(graph_fixture: Graph) -> None:
@@ -35,11 +39,6 @@ def test_neighborhood_does_not_mutate(graph_fixture: Graph) -> None:
 
 
 def test_expand_grows_graph(graph_fixture: Graph) -> None:
-    graph = graph_fixture
+    result = expand(next(iter(graph_fixture.nodes)), depth=2)
 
-    initial_nodes = set(graph.nodes)
-
-    result = expand([next(iter(graph.nodes))], graph, depth=2)
-
-    assert len(graph.nodes) >= len(initial_nodes)
-    assert isinstance(result, set)
+    assert result["nodes"]

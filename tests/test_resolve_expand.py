@@ -1,8 +1,9 @@
+# pyright: reportPrivateUsage=false
+
 import pytest
 
-from iterative_context.exploration import expand, resolve, resolve_and_expand
+from iterative_context.exploration import _set_active_graph, expand, resolve, resolve_and_expand
 from iterative_context.graph_models import Graph
-from iterative_context.store import GraphStore
 from iterative_context.test_helpers.graph_dsl import build_graph
 
 
@@ -26,40 +27,35 @@ def make_graph_with_symbols() -> Graph:
 
 
 @pytest.fixture
-def graph_store_fixture() -> tuple[Graph, GraphStore]:
+def activate_graph() -> Graph:
     graph = make_graph_with_symbols()
-    store = GraphStore(graph)
-    return graph, store
+    _set_active_graph(graph)
+    return graph
 
 
-def test_resolve_symbol(graph_store_fixture: tuple[Graph, GraphStore]) -> None:
-    _, store = graph_store_fixture
-
-    ids = resolve("expand_node", store)
-    assert len(ids) > 0
-    assert "A" in ids
+def test_resolve_symbol(activate_graph: Graph) -> None:
+    node = resolve("expand_node")
+    assert node is not None
+    assert node.id == "A"
 
 
-def test_resolve_deterministic(graph_store_fixture: tuple[Graph, GraphStore]) -> None:
-    _, store = graph_store_fixture
-    query = "expand_node"
-
-    assert resolve(query, store) == resolve(query, store)
-
-
-def test_expand_multi_anchor(graph_store_fixture: tuple[Graph, GraphStore]) -> None:
-    graph, _ = graph_store_fixture
-
-    result = expand(["A", "B"], graph, depth=2)
-
-    assert isinstance(result, set)
-    assert result  # neighborhood should not be empty
+def test_resolve_deterministic(activate_graph: Graph) -> None:
+    node1 = resolve("expand_node")
+    node2 = resolve("expand_node")
+    assert node1 is not None and node2 is not None
+    assert node1.id == node2.id
 
 
-def test_resolve_and_expand_integration(graph_store_fixture: tuple[Graph, GraphStore]) -> None:
-    graph, _ = graph_store_fixture
+def test_expand_returns_snapshot(activate_graph: Graph) -> None:
+    snapshot = expand("A", depth=2)
+    assert snapshot["nodes"]
 
-    result = resolve_and_expand("expand_node", graph, depth=2)
 
-    assert isinstance(result, set)
-    assert len(result) > 0
+def test_resolve_and_expand_integration(activate_graph: Graph) -> None:
+    direct_node = resolve("expand_node")
+    assert direct_node is not None
+    manual = expand(direct_node.id, depth=2)
+
+    combined = resolve_and_expand("expand_node", depth=2)
+
+    assert manual == combined

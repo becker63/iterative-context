@@ -1,6 +1,8 @@
+# pyright: reportPrivateUsage=false
 from typing import Any
 
 from iterative_context.expansion import expand_node  # type: ignore
+from iterative_context.exploration import _set_active_graph, expand
 from iterative_context.test_helpers import (  # type: ignore
     GraphSnapshot,
     apply_events,
@@ -87,3 +89,24 @@ def test_valid_edge_structure():
     assert edge.source == "A"
     assert edge.target == "A_child"
     assert edge.kind == "calls"
+
+
+def test_expand_respects_depth():
+    spec = {
+        "nodes": [
+            {"id": "A", "kind": "symbol", "state": "pending"},
+            {"id": "B", "kind": "symbol", "state": "pending"},
+            {"id": "C", "kind": "symbol", "state": "pending"},
+        ],
+        "edges": [
+            {"source": "A", "target": "B", "kind": "calls"},
+            {"source": "B", "target": "C", "kind": "calls"},
+        ],
+    }
+    graph = build_graph(spec)  # type: ignore[arg-type]
+    _set_active_graph(graph)
+
+    depth_one = expand("A", depth=1)
+    depth_two = expand("A", depth=2)
+
+    assert len(depth_two["nodes"]) >= len(depth_one["nodes"])

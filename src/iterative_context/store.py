@@ -1,7 +1,9 @@
 from collections import deque
-from typing import Any
+from typing import Any, cast
 
-from iterative_context.graph_models import Graph, GraphEdge
+from pydantic import BaseModel
+
+from iterative_context.graph_models import Graph, GraphEdge, GraphNode
 
 
 class GraphStore:
@@ -23,6 +25,8 @@ class GraphStore:
         self.nodes_by_id: dict[str, dict[str, Any]] = {}
         self.nodes_by_symbol: dict[str, list[str]] = {}
         self.nodes_by_file: dict[str, list[str]] = {}
+        self.index_by_symbol: dict[str, list[str]] = {}
+        self.index_by_file: dict[str, list[str]] = {}
 
         self.out_edges: dict[str, list[GraphEdge]] = {}
         self.in_edges: dict[str, list[GraphEdge]] = {}
@@ -37,10 +41,20 @@ class GraphStore:
             symbol = node_data.get("symbol")
             if isinstance(symbol, str):
                 self.nodes_by_symbol.setdefault(symbol, []).append(node_id)
+                self.index_by_symbol.setdefault(symbol, []).append(node_id)
 
             file_value = node_data.get("file")
             if isinstance(file_value, str):
                 self.nodes_by_file.setdefault(file_value, []).append(node_id)
+                self.index_by_file.setdefault(file_value, []).append(node_id)
+        for mapping in (
+            self.nodes_by_symbol,
+            self.nodes_by_file,
+            self.index_by_symbol,
+            self.index_by_file,
+        ):
+            for key in mapping:
+                mapping[key] = sorted(mapping[key])
 
         for src, dst, data in sorted(
             self.graph.edges(data=True), key=lambda item: (item[0], item[1])
@@ -65,6 +79,45 @@ class GraphStore:
 
     def find_symbol(self, symbol: str) -> list[str]:
         return list(self.nodes_by_symbol.get(symbol, []))
+
+    def _node_for_id(self, node_id: str) -> GraphNode | None:
+        data = self.graph.nodes.get(node_id)
+        if data is None:
+            return None
+        if "data" in data:
+            inner = data.get("data")
+            if isinstance(inner, BaseModel):
+                return cast(GraphNode, inner)
+        if isinstance(data, BaseModel):
+            return cast(GraphNode, data)
+        return None
+
+    def resolve(self, query: str) -> GraphNode | None:
+        """
+        Deterministic lookup using symbol/file indexes only.
+
+        No traversal or mutation.
+        """
+        exact = self.index_by_symbol.get(query, [])
+        if exact:
+            node = self._node_for_id(sorted(exact)[0])
+            if node:
+                return node
+
+        lowered = query.lower()
+        for sym, ids in sorted(self.index_by_symbol.items(), key=lambda item: item[0]):
+            if lowered in sym.lower():
+                node = self._node_for_id(ids[0])
+                if node:
+                    return node
+
+        for path, ids in sorted(self.index_by_file.items(), key=lambda item: item[0]):
+            if lowered in path.lower():
+                node = self._node_for_id(ids[0])
+                if node:
+                    return node
+
+        return None
 
     def get_neighbors(self, node_id: str, kinds: list[str] | None = None) -> list[str]:
         neighbors: set[str] = set()
