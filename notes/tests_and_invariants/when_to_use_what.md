@@ -481,9 +481,3 @@ Snapshots → map the curve
 Properties → keep it valid
 Metamorphic → start probing it
 ```
-
----
-
-If you want next, we can:
-
-👉 turn one of your existing snapshot tests into **all three perspectives at once** (this is where it really locks in)

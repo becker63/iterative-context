@@ -46,9 +46,13 @@ notes/
       concept.md
       tests_to_impl.md
       vs_property_testing.md
-    property_based_setup.md
-    property_based_tests.md
-    testing_scoring.md
+    property/
+      property_based_setup.md
+      property_based_tests.md
+      testing_scoring.md
+    the_difference.md
+    when_to_use_what.md
+  core_idea.md
   development_phases.md
   effort_estimate_and_next_moves.md
   scoring_v1.md
@@ -84,6 +88,10 @@ README.md
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="notes/core_idea.md">
+so the core idea is that we're wrapping this jcodemunch tool which provides these existing tools through tree sitter, we will need to project it into a single cohesive graph but thats fine and a prob for later, the actual ast we get should be pluggable anyway the core idea is that once we have mcp servers like this which provide us the code ast in some way, we should be able to also do some level of in depth search over the ast maybe 5-6 nodes in advance on the behalf of the llm. Almost like something that sits in front of the queries or alternatively its own tool call for exploring in depth. We're moving more of the search over code into computation instead of giving that to an llm. My code development loop involves using a very aggressive and very fast agent from cerebras because my philosophy tells me the tighter the loops the more reliable these things are, so we're combining metamorphic testing through snapshot tests, with property testing. And then later in the later phases we can think about using the same test framework for scoring based on some metric, and we can let the bot go crazy on letting it explore computations that score better than jcodemunch
+</file>
 
 <file path="notes/tests_and_invariants/metamorphic/tests_to_impl.md">
 Perfect — let’s make this **actionable and high-signal**.
@@ -882,7 +890,7 @@ If you want next, we can:
 👉 or implement your first metamorphic test using your existing DSL + snapshot setup
 </file>
 
-<file path="notes/tests_and_invariants/property_based_setup.md">
+<file path="notes/tests_and_invariants/property/property_based_setup.md">
 Short answer:
 👉 **Yes — Hypothesis is a very good fit here.**
 But use it *surgically*, not everywhere.
@@ -1249,7 +1257,7 @@ If you want next, I can:
 👉 or help you build a **minimal but correct event generator** that won’t fight you during debugging
 </file>
 
-<file path="notes/tests_and_invariants/testing_scoring.md">
+<file path="notes/tests_and_invariants/property/testing_scoring.md">
 Perfect — this is where Hypothesis stops being “nice to have” and becomes **core to your system design**.
 
 You’re moving from:
@@ -1701,6 +1709,913 @@ If you want next, I can:
 
 👉 turn your current DSL into a **Hypothesis state machine** (this is the “real power” version)
 👉 or design a **minimal traversal loop** so you can start testing scoring + expansion together
+</file>
+
+<file path="notes/tests_and_invariants/the_difference.md">
+This is a great moment to crystallize things — you now have **three tools that look similar but do very different jobs**.
+
+I’ll give you a **tight, side-by-side comparison**, then a **decision framework you can actually use while coding**.
+
+---
+
+# 🧠 The clean comparison (core idea)
+
+| Type        | What it checks                    | Shape                        |
+| ----------- | --------------------------------- | ---------------------------- |
+| Snapshot    | “Did this exact behavior change?” | single run → saved output    |
+| Property    | “Is this always valid?”           | single run → invariant       |
+| Metamorphic | “Does behavior change correctly?” | multiple runs → relationship |
+
+---
+
+# 🔬 Same system, three perspectives
+
+Let’s use your system:
+
+```text
+graph + events → replay → graph evolution
+```
+
+---
+
+## 🟦 Snapshot testing
+
+```text
+input → output → compare to saved output
+```
+
+```python
+steps = replay(...)
+snapshot.assert_match(render_steps(steps))
+```
+
+### What it gives you
+
+* locks behavior exactly
+* shows diffs when behavior changes
+* documents system evolution
+
+---
+
+## 🟩 Property testing
+
+```text
+input → output → check invariant
+```
+
+```python
+assert no_dangling_edges(graph)
+```
+
+### What it gives you
+
+* guarantees safety
+* catches edge cases automatically
+* protects core correctness
+
+---
+
+## 🟨 Metamorphic testing
+
+```text
+input A → output A
+input B → output B
+assert relation(output A, output B)
+```
+
+```python
+assert normalize(r1) == normalize(r2)
+```
+
+### What it gives you
+
+* validates behavior under change
+* catches subtle logic bugs
+* ensures consistency
+
+---
+
+# 🧠 What each one ADDS (this is the important part)
+
+---
+
+## 🟦 Snapshot adds: **regression visibility**
+
+```text
+“What changed?”
+```
+
+Without snapshots:
+
+* you don’t notice behavioral drift
+* debugging is harder
+
+---
+
+## 🟩 Property adds: **safety guarantees**
+
+```text
+“What must never break?”
+```
+
+Without properties:
+
+* silent corruption possible
+* edge cases slip through
+
+---
+
+## 🟨 Metamorphic adds: **behavioral correctness**
+
+```text
+“Does the system respond correctly to change?”
+```
+
+Without metamorphic:
+
+* system looks “valid” but behaves wrong
+* subtle bugs survive
+
+---
+
+# 🔥 What each one CANNOT do
+
+This is key.
+
+---
+
+## ❌ Snapshot cannot:
+
+* prove correctness
+* catch invariants
+* generalize beyond examples
+
+---
+
+## ❌ Property cannot:
+
+* tell you what changed
+* validate relative behavior
+* ensure “good” outcomes
+
+---
+
+## ❌ Metamorphic cannot:
+
+* detect invalid states (alone)
+* define absolute correctness
+* replace invariants
+
+---
+
+# 🧠 When to use each (practical rules)
+
+---
+
+## 🟦 Use SNAPSHOT when:
+
+```text
+you KNOW what the output should look like
+```
+
+Examples:
+
+* event replay
+* graph evolution steps
+* deterministic scenarios
+
+---
+
+## 🟩 Use PROPERTY when:
+
+```text
+you KNOW something must ALWAYS be true
+```
+
+Examples:
+
+* no dangling edges
+* determinism
+* monotonic growth
+
+---
+
+## 🟨 Use METAMORPHIC when:
+
+```text
+you KNOW how behavior SHOULD CHANGE
+```
+
+Examples:
+
+* adding noise → no effect
+* renaming nodes → same structure
+* more evidence → better ranking
+
+---
+
+# 🧠 The decision tree (use this while coding)
+
+---
+
+### Step 1
+
+```text
+Do I know the exact expected output?
+```
+
+👉 YES → Snapshot
+
+---
+
+### Step 2
+
+```text
+Do I know a rule that must always hold?
+```
+
+👉 YES → Property
+
+---
+
+### Step 3
+
+```text
+Do I know how output should change if input changes?
+```
+
+👉 YES → Metamorphic
+
+---
+
+# 🔥 How they work together (this is the good part)
+
+---
+
+## Example: Your test today
+
+```python
+snapshot.assert_match(rendered_steps)
+```
+
+👉 Snapshot ensures:
+
+```text
+behavior didn’t change
+```
+
+---
+
+## Add property:
+
+```python
+assert no_dangling_edges(graph)
+```
+
+👉 Property ensures:
+
+```text
+system isn’t broken
+```
+
+---
+
+## Add metamorphic:
+
+```python
+assert same_behavior_with_noise(...)
+```
+
+👉 Metamorphic ensures:
+
+```text
+behavior is meaningful
+```
+
+---
+
+## Combined result
+
+```text
+stable + safe + correct
+```
+
+---
+
+# 🧠 Mental model (best one)
+
+Think of your system as:
+
+```text
+a function evolving over time
+```
+
+---
+
+## Snapshot tests
+
+```text
+sample points on the curve
+```
+
+---
+
+## Property tests
+
+```text
+constraints the curve must obey
+```
+
+---
+
+## Metamorphic tests
+
+```text
+how the curve changes when inputs shift
+```
+
+---
+
+# 🔥 Where each dominates (important)
+
+---
+
+## Early system
+
+```text
+“I need to see what happens”
+→ Snapshot heavy
+```
+
+---
+
+## Stabilizing system
+
+```text
+“I need to ensure nothing breaks”
+→ Property heavy
+```
+
+---
+
+## Intelligent system (your future)
+
+```text
+“I need to ensure behavior is good”
+→ Metamorphic heavy
+```
+
+---
+
+# 🧾 Final distilled comparison
+
+---
+
+### Snapshot
+
+```text
+Locks behavior
+Best for: known scenarios
+Failure means: behavior changed
+```
+
+---
+
+### Property
+
+```text
+Enforces invariants
+Best for: correctness guarantees
+Failure means: system is broken
+```
+
+---
+
+### Metamorphic
+
+```text
+Validates behavior under change
+Best for: heuristics / scoring
+Failure means: logic is wrong
+```
+
+---
+
+# 🚀 Final recommendation for YOU
+
+Right now (Phase 1–2):
+
+```text
+Snapshots → primary
+Properties → essential safety
+Metamorphic → start introducing
+```
+
+---
+
+Soon (Phase 3):
+
+```text
+All three equally important
+```
+
+---
+
+If you want next, we can:
+
+👉 turn one of your existing snapshot tests into a **combined snapshot + property + metamorphic test** (this is where it really clicks)
+</file>
+
+<file path="notes/tests_and_invariants/when_to_use_what.md">
+Perfect — this is the *right abstraction to anchor everything*. I’ll rewrite your phase mapping using that mental model so it really sticks.
+
+---
+
+# 🧠 Core mental model (anchor this)
+
+Think of your system as:
+
+```text
+a function evolving over time
+```
+
+---
+
+### 🟦 Snapshot tests
+
+```text
+sample points on the curve
+```
+
+👉 “What does the system do here?”
+
+---
+
+### 🟩 Property tests
+
+```text
+constraints the curve must obey
+```
+
+👉 “What must NEVER happen anywhere?”
+
+---
+
+### 🟨 Metamorphic tests
+
+```text
+how the curve changes when inputs shift
+```
+
+👉 “Does the curve move correctly when I perturb it?”
+
+---
+
+# 🔥 Phase-by-phase (with this model)
+
+---
+
+# 🟢 Phase 0 — Graph + Events Exist
+
+### System:
+
+```text
+the curve barely exists yet
+```
+
+---
+
+## 🟩 Property (PRIMARY)
+
+```text
+define the shape constraints of the curve
+```
+
+You’re saying:
+
+* curve must not break
+* graph must always be valid
+
+---
+
+## 🟦 Snapshot (SECONDARY)
+
+```text
+sample a few early points
+```
+
+* “this input → this graph”
+
+---
+
+## 🟨 Metamorphic
+
+```text
+not meaningful yet
+```
+
+👉 No real “curve behavior” yet
+
+---
+
+# 🟢 Phase 1 — Deterministic Loop
+
+### System:
+
+```text
+the curve is now visible over time
+```
+
+---
+
+## 🟦 Snapshot (PRIMARY ⭐)
+
+```text
+capture points along the curve
+```
+
+* step 0 → step 1 → step 2
+
+👉 You are literally recording the curve
+
+---
+
+## 🟩 Property
+
+```text
+ensure the curve is well-formed
+```
+
+* deterministic
+* iteration doesn’t mutate
+
+---
+
+## 🟨 Metamorphic
+
+```text
+barely relevant
+```
+
+Maybe:
+
+* small invariances
+
+---
+
+# 🟢 Phase 2 — Synthetic Expansion
+
+### System:
+
+```text
+the curve is growing and branching
+```
+
+---
+
+## 🟦 Snapshot (PRIMARY ⭐)
+
+```text
+document how the curve evolves
+```
+
+* growth over steps
+* structure over time
+
+---
+
+## 🟩 Property (STRONG)
+
+```text
+ensure the curve never becomes invalid
+```
+
+* no dangling edges
+* monotonic growth
+
+---
+
+## 🟨 Metamorphic (START)
+
+```text
+test how the curve reacts to small perturbations
+```
+
+Examples:
+
+* add noise → curve unchanged
+* iteration → no movement
+
+---
+
+👉 This is where you start asking:
+
+```text
+“does the curve behave consistently?”
+```
+
+---
+
+# 🟡 Phase 3 — Scoring + Selection
+
+### System:
+
+```text
+the curve is now being shaped intentionally
+```
+
+(decisions affect its path)
+
+---
+
+## 🟦 Snapshot
+
+```text
+sample important trajectories
+```
+
+* “this scoring → this path”
+
+---
+
+## 🟩 Property (CRITICAL)
+
+```text
+ensure the curve obeys decision laws
+```
+
+* max(score) is chosen
+* no infinite loops
+
+---
+
+## 🟨 Metamorphic (PRIMARY ⭐)
+
+```text
+test how the curve shifts under input changes
+```
+
+Examples:
+
+* add irrelevant node → curve unchanged
+* increase tokens → curve shifts toward node
+
+---
+
+👉 Now you care about:
+
+```text
+is the curve moving correctly?
+```
+
+---
+
+# 🟡 Phase 4 — Snapshot as Spec
+
+### System:
+
+```text
+the curve is now considered “correct”
+```
+
+---
+
+## 🟦 Snapshot (PRIMARY ⭐⭐⭐)
+
+```text
+freeze important sections of the curve
+```
+
+👉 This is your **spec**
+
+---
+
+## 🟩 Property
+
+```text
+ensure constraints still hold everywhere
+```
+
+---
+
+## 🟨 Metamorphic
+
+```text
+validate key invariances of the curve
+```
+
+But only for:
+
+* core behaviors
+
+---
+
+# 🟡 Phase 5 — Partial Data Handling
+
+### System:
+
+```text
+the curve is now noisy / incomplete
+```
+
+---
+
+## 🟩 Property (PRIMARY ⭐)
+
+```text
+ensure the curve never breaks under noise
+```
+
+---
+
+## 🟨 Metamorphic (STRONG)
+
+```text
+ensure the curve degrades gracefully
+```
+
+Examples:
+
+* missing data → small distortion
+* partial graph → still valid
+
+---
+
+## 🟦 Snapshot
+
+```text
+less useful (curve too variable)
+```
+
+---
+
+# 🔴 Phase 6 — Real Adapter
+
+### System:
+
+```text
+the curve is driven by messy real-world input
+```
+
+---
+
+## 🟩 Property (PRIMARY)
+
+```text
+ensure the curve stays valid under chaos
+```
+
+---
+
+## 🟨 Metamorphic (PRIMARY)
+
+```text
+ensure the curve is stable under noise
+```
+
+Examples:
+
+* reorder input → same curve
+* partial data → similar curve
+
+---
+
+## 🟦 Snapshot
+
+```text
+only for curated cases
+```
+
+---
+
+# 🔴 Phase 7 — Refinement Loop
+
+### System:
+
+```text
+you are actively improving the curve
+```
+
+---
+
+## 🟨 Metamorphic (PRIMARY ⭐⭐⭐)
+
+```text
+compare how the curve shifts under improvements
+```
+
+Examples:
+
+* better signal → better trajectory
+* noise → minimal deviation
+* small input change → smooth curve change
+
+---
+
+## 🟩 Property
+
+```text
+ensure constraints still hold
+```
+
+---
+
+## 🟦 Snapshot
+
+```text
+only for benchmarks
+```
+
+---
+
+# 🧠 The full map (reframed)
+
+| Phase | What the curve is | Snapshot            | Property               | Metamorphic           |
+| ----- | ----------------- | ------------------- | ---------------------- | --------------------- |
+| 0     | barely exists     | sample points       | ⭐⭐⭐ define constraints | ❌                     |
+| 1     | visible over time | ⭐⭐⭐ trace curve     | ⭐⭐ validate shape      | ❌                     |
+| 2     | growing           | ⭐⭐⭐ document growth | ⭐⭐ enforce validity    | ⭐ start               |
+| 3     | decision-driven   | ⭐ sample paths      | ⭐⭐⭐ enforce rules      | ⭐⭐⭐ shape correctness |
+| 4     | stable/spec       | ⭐⭐⭐ freeze curve    | ⭐⭐ enforce             | ⭐⭐ invariances        |
+| 5     | noisy             | ⭐ limited           | ⭐⭐⭐ robustness         | ⭐⭐⭐ graceful change   |
+| 6     | real-world        | ⚠️ minimal          | ⭐⭐⭐ safety             | ⭐⭐⭐ stability         |
+| 7     | optimized         | ⭐ benchmarks        | ⭐⭐ enforce             | ⭐⭐⭐ improvement       |
+
+---
+
+# 🔥 The intuition (cleanest version)
+
+---
+
+## 🟦 Snapshot
+
+```text
+“What does the curve look like here?”
+```
+
+---
+
+## 🟩 Property
+
+```text
+“What shape must the curve always have?”
+```
+
+---
+
+## 🟨 Metamorphic
+
+```text
+“How should the curve move when I push it?”
+```
+
+---
+
+# 🧾 Final rule (now with the model)
+
+When writing a test, ask:
+
+---
+
+### 1. Am I sampling the curve?
+
+👉 Snapshot
+
+---
+
+### 2. Am I constraining the curve?
+
+👉 Property
+
+---
+
+### 3. Am I perturbing the curve?
+
+👉 Metamorphic
+
+---
+
+# 🚀 Your current position
+
+You are here:
+
+```text
+curve is visible and growing (Phase 1–2)
+```
+
+So:
+
+```text
+Snapshots → map the curve
+Properties → keep it valid
+Metamorphic → start probing it
+```
+
+---
+
+If you want next, we can:
+
+👉 turn one of your existing snapshot tests into **all three perspectives at once** (this is where it really locks in)
 </file>
 
 <file path="notes/development_phases.md">
