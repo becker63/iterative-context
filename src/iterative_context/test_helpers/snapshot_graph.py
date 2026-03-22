@@ -1,7 +1,7 @@
 # pyright: reportMissingTypeStubs=false
 import json
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 from pytest_snapshot.plugin import Snapshot
 
@@ -58,12 +58,17 @@ def normalize_graph(graph: Any) -> dict[str, list[dict[str, Any]]]:
     nodes: list[dict[str, Any]] = []
     for _, data in graph.nodes(data=True):
         if isinstance(data, dict):
-            # Ensure required fields exist
-            for k in ("id", "kind", "state"):
-                if k not in data:
-                    raise ValueError(f"Node missing required field '{k}'")
-            tmp = SimpleNamespace(**data)
-            normalized = normalize_node(tmp)  # type: ignore[arg-type]
+            # If the node stores a typed GraphNode under the "data" key, use it.
+            if "data" in data:
+                node_obj = cast(GraphNode, data["data"])
+                normalized = normalize_node(node_obj)  # type: ignore[arg-type]
+            else:
+                # Ensure required fields exist for raw dict nodes.
+                for k in ("id", "kind", "state"):
+                    if k not in data:
+                        raise ValueError(f"Node missing required field '{k}'")
+                tmp = SimpleNamespace(**data)
+                normalized = normalize_node(tmp)  # type: ignore[arg-type]
         else:
             normalized = normalize_node(data)  # type: ignore[arg-type]
         nodes.append(normalized)
@@ -71,9 +76,14 @@ def normalize_graph(graph: Any) -> dict[str, list[dict[str, Any]]]:
     edges: list[dict[str, Any]] = []
     for source, target, data in graph.edges(data=True):
         if isinstance(data, dict):
-            # Merge source and target into the temporary namespace.
-            tmp = SimpleNamespace(source=source, target=target, **data)
-            edge_dict = normalize_edge(tmp)  # type: ignore[arg-type]
+            # If a typed GraphEdge is stored under the "data" key, use it directly.
+            if "data" in data:
+                edge_obj = cast(GraphEdge, data["data"])
+                edge_dict = normalize_edge(edge_obj)  # type: ignore[arg-type]
+            else:
+                # Merge source and target into the temporary namespace for raw dicts.
+                tmp = SimpleNamespace(source=source, target=target, **data)
+                edge_dict = normalize_edge(tmp)  # type: ignore[arg-type]
         else:
             edge_dict = normalize_edge(data)
         edges.append(_remove_none(edge_dict))
@@ -88,7 +98,7 @@ def render_steps(steps: list[dict[str, Any]]) -> str:
     rendered_steps = json.dumps(
         [
             {
-                "event": step["event"],
+                "event": normalize_event(step["event"]) if step["event"] else None,
                 "graph": normalize_graph(step["graph"]),  # type: ignore[arg-type]
             }
             for step in steps
@@ -119,6 +129,11 @@ def normalize_event(event: GraphEvent) -> dict[str, Any]:
     return {"type": "iteration", "step": event.step}
 
 
+def to_event_dict(event: GraphEvent) -> dict[str, Any]:
+    """Return a JSON-serializable representation of a GraphEvent."""
+    return normalize_event(event)
+
+
 class GraphSnapshot:
     """Wrapper around the ``snapshot`` fixture providing domain‑aware assertions."""
 
@@ -145,7 +160,7 @@ class GraphSnapshot:
         self._assert(normalize_graph(graph), self._next_name("graph"))
 
     def assert_events(self, events: list[GraphEvent]) -> None:  # type: ignore[arg-type]
-        normalized = [normalize_event(ev) for ev in events]
+        normalized = [to_event_dict(ev) for ev in events]
         self._assert(normalized, self._next_name("events"))
 
     def assert_node(self, node: GraphNode) -> None:  # type: ignore[arg-type]
@@ -161,5 +176,6 @@ __all__ = [
     "normalize_graph",
     "render_steps",
     "normalize_event",
+    "to_event_dict",
     "GraphSnapshot",
 ]

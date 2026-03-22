@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+# Public alias for the directed graph type used throughout the system.
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import networkx as nx
 from pydantic import BaseModel, Field
 from rx.subject.subject import Subject
 
-# Public alias for the directed graph type used throughout the system.
-Graph = nx.DiGraph
+if TYPE_CHECKING:
+    Graph = nx.DiGraph[Any]
+else:
+    Graph = nx.DiGraph
 
 # ----------------------------------------------------------------------
 # Core node definitions
@@ -81,13 +85,13 @@ class GraphEdge(BaseModel):
 
 class AddNodesEvent(BaseModel):
     type: Literal["addNodes"] = "addNodes"
-    nodes: list[GraphNode]
+    nodes: Sequence[GraphNode]
     reason: str | None = None
 
 
 class AddEdgesEvent(BaseModel):
     type: Literal["addEdges"] = "addEdges"
-    edges: list[GraphEdge]
+    edges: Sequence[GraphEdge]
     reason: str | None = None
 
 
