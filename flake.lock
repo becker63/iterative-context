@@ -18,6 +18,22 @@
         "type": "github"
       }
     },
+    "medium": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1767163888,
+        "narHash": "sha256-8ypl0P+vS39r6TaZHL4m5V3TTGHX97AQ5NTSKztx008=",
+        "owner": "pallets",
+        "repo": "click",
+        "rev": "cdab890e57a30a9f437b88ce9652f7bfce980c1f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pallets",
+        "repo": "click",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1773734432,
@@ -37,7 +53,25 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "medium": "medium",
+        "nixpkgs": "nixpkgs",
+        "small": "small"
+      }
+    },
+    "small": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1749933342,
+        "narHash": "sha256-5n8WD1A/Bh15iLmOsM1pyB9UTc35NWedLMH4gClxOvE=",
+        "owner": "pallets",
+        "repo": "itsdangerous",
+        "rev": "672971d66a2ef9f85151e53283113f33d642dabd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pallets",
+        "repo": "itsdangerous",
+        "type": "github"
       }
     },
     "systems": {

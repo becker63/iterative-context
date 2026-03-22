@@ -14,6 +14,7 @@ dependencies = [
     "basedpyright>=1.5.0",
     "ruff>=0.4.0",
     "hypothesis>=6.151.9",
+    "llm-tldr>=1.5.2",
 ]
 packages = [{ include = "iterative_context", from = "src" }]
 
