@@ -15,6 +15,7 @@ dependencies = [
     "ruff>=0.4.0",
     "hypothesis>=6.151.9",
     "llm-tldr>=1.5.2",
+    "mcp>=1.26.0",
 ]
 packages = [{ include = "iterative_context", from = "src" }]
 

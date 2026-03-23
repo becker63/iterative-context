@@ -37,4 +37,9 @@ def score_random(node: GraphNode, graph: Graph, step: int) -> float:
     return int(hashlib.md5(key).hexdigest(), 16) % 1000
 
 
-__all__ = ["score_v1", "score_degree", "score_random"]
+def default_score_fn(node: GraphNode, graph: Graph, step: int) -> float:
+    """Default scoring entrypoint."""
+    return score_v1(node, graph, step)
+
+
+__all__ = ["score_v1", "score_degree", "score_random", "default_score_fn"]

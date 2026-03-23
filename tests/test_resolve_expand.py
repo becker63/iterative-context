@@ -2,8 +2,14 @@
 
 import pytest
 
-from iterative_context.exploration import _set_active_graph, expand, resolve, resolve_and_expand
-from iterative_context.graph_models import Graph
+from iterative_context.exploration import (
+    _set_active_graph,
+    expand,
+    expand_with_policy,
+    resolve,
+    resolve_and_expand,
+)
+from iterative_context.graph_models import Graph, GraphNode
 from iterative_context.test_helpers.graph_dsl import build_graph
 
 
@@ -59,3 +65,12 @@ def test_resolve_and_expand_integration(activate_graph: Graph) -> None:
     combined = resolve_and_expand("expand_node", depth=2)
 
     assert manual == combined
+
+
+def test_expand_with_callable_policy(activate_graph: Graph) -> None:
+    def score(node: GraphNode, graph: Graph, step: int) -> float:
+        return 1.0
+
+    result = expand_with_policy("A", depth=1, score_fn=score)
+
+    assert result is not None

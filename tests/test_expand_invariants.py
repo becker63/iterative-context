@@ -88,3 +88,14 @@ def test_expand_no_dangling_edges() -> None:
     for edge in snapshot["edges"]:
         assert edge["source"] in node_ids
         assert edge["target"] in node_ids
+
+
+def test_expand_reports_metadata() -> None:
+    graph = build_graph(_make_chain(2))  # type: ignore[arg-type]
+    _set_active_graph(graph)
+
+    snapshot = expand("A", depth=3)
+
+    metadata = snapshot.get("metadata", {})
+    assert metadata["depth"] == 3
+    assert metadata["expanded_from"] == "A"
