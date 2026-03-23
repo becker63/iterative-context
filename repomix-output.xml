@@ -210,343 +210,6 @@ This section contains the contents of the repository's files.
 ['expand', 'expand_with_policy', 'resolve', 'resolve_and_expand']
 </file>
 
-<file path=".hypothesis/constants/24ae513378f5d4b9">
-# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
-# hypothesis_version: 6.151.9
-
-['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'symbol', 'type']
-</file>
-
-<file path=".hypothesis/constants/3512881a7553cd78">
-# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
-# hypothesis_version: 6.151.9
-
-['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'symbol', 'type']
-</file>
-
-<file path=".hypothesis/constants/3b512d88fc2a2d11">
-# file: /home/becker/projects/iterative-context/src/iterative_context/types.py
-# hypothesis_version: 6.151.9
-
-['SelectionCallable']
-</file>
-
-<file path=".hypothesis/constants/3c0584d65958af1c">
-# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/3db258270ee98da6">
-# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/5601d1e117c1fc34">
-# file: /home/becker/projects/iterative-context/src/iterative_context/scoring_eval.py
-# hypothesis_version: 6.151.9
-
-['choose', 'compare_scorings', 'final_graph', 'graph_steps', 'run_with_scoring', 'score_history', 'scores', 'steps']
-</file>
-
-<file path=".hypothesis/constants/58c239323047b7b0">
-# file: /home/becker/projects/iterative-context/src/iterative_context/serialization.py
-# hypothesis_version: 6.151.9
-
-['data', 'edges', 'file', 'id', 'kind', 'metadata', 'nodes', 'references', 'serialize_graph', 'serialize_node', 'source', 'state', 'symbol', 'target', 'tokens', 'type']
-</file>
-
-<file path=".hypothesis/constants/58d5b4e9df76e576">
-# file: /home/becker/projects/iterative-context/src/iterative_context/selection_policy.py
-# hypothesis_version: 6.151.9
-
-['SelectionPolicy', 'invalid score', 'load_policy_module', 'policy.py', 'score']
-</file>
-
-<file path=".hypothesis/constants/95745ae7821e913c">
-# file: /home/becker/projects/iterative-context/src/iterative_context/scoring.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.5, 5.0, 10.0, 1000, 'anchor', 'default_score_fn', 'pending', 'score_degree', 'score_random', 'score_v1', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/b7399df8dfb54d7f">
-# file: /home/becker/projects/iterative-context/src/iterative_context/selection_policy.py
-# hypothesis_version: 6.151.9
-
-['SelectionPolicy', 'invalid score', 'load_policy_module', 'policy.py', 'score']
-</file>
-
-<file path=".hypothesis/constants/b75c81381467ac8f">
-# file: /home/becker/projects/iterative-context/src/iterative_context/store.py
-# hypothesis_version: 6.151.9
-
-['calls', 'data', 'edges', 'file', 'id', 'imports', 'kind', 'nodes', 'primary', 'references', 'symbol']
-</file>
-
-<file path=".hypothesis/constants/bfe2589bcb9c445a">
-# file: /home/becker/projects/iterative-context/src/iterative_context/selection_policy.py
-# hypothesis_version: 6.151.9
-
-['SelectionPolicy', 'invalid score']
-</file>
-
-<file path=".hypothesis/constants/d4e524a60be919bc">
-# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
-# hypothesis_version: 6.151.9
-
-['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'symbol', 'type']
-</file>
-
-<file path=".hypothesis/constants/dc9f1dcaf34c53f5">
-# file: /home/becker/projects/iterative-context/src/iterative_context/scoring_eval.py
-# hypothesis_version: 6.151.9
-
-['choose', 'compare_scorings', 'final_graph', 'graph_steps', 'run_with_scoring', 'score_history', 'scores', 'steps']
-</file>
-
-<file path=".hypothesis/constants/e15096283a36eedb">
-# file: /home/becker/projects/iterative-context/src/iterative_context/types.py
-# hypothesis_version: 6.151.9
-
-['ScoreFn', 'SelectionCallable']
-</file>
-
-<file path=".hypothesis/constants/ed26139e2d297362">
-# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/ed532b0e7fb4c6c5">
-# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
-# hypothesis_version: 6.151.9
-
-[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
-</file>
-
-<file path=".hypothesis/constants/f901122776c6e35d">
-# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
-# hypothesis_version: 6.151.9
-
-['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'symbol', 'type']
-</file>
-
-<file path="src/iterative_context/selection_policy.py">
-from __future__ import annotations
-
-import math
-from collections.abc import Sequence
-from typing import Protocol
-
-from iterative_context.graph_models import Graph, GraphNode
-from iterative_context.types import SelectionCallable
-
-
-class SelectionPolicy(Protocol):
-    """Deterministic selection policy interface."""
-
-    def score(self, node: GraphNode, graph: Graph, step: int) -> float:
-        ...
-
-    def choose(self, candidates: Sequence[GraphNode], graph: Graph, step: int) -> GraphNode:
-        ...
-
-
-class CallableSelectionPolicy:
-    """Adapter to treat a plain scoring function as a selection policy."""
-
-    def __init__(self, fn: SelectionCallable):
-        self._fn = fn
-
-    def score(self, node: GraphNode, graph: Graph, step: int) -> float:
-        try:
-            value: object = self._fn(node, graph, step)
-        except Exception as e:  # pragma: no cover - defensive guard
-            raise RuntimeError(f"Policy crashed: {e}") from e
-
-        if not isinstance(value, (int, float)):  # pyright: ignore[reportUnnecessaryIsInstance]
-            raise ValueError("score must be numeric")
-
-        numeric = float(value)
-
-        if math.isnan(numeric) or math.isinf(numeric):
-            raise ValueError("invalid score")
-
-        return numeric
-
-    def choose(self, candidates: Sequence[GraphNode], graph: Graph, step: int) -> GraphNode:
-        return max(candidates, key=lambda n: (self.score(n, graph, step), n.id))
-
-
-def wrap_selection_callable(fn: SelectionCallable) -> CallableSelectionPolicy:
-    return CallableSelectionPolicy(fn)
-
-
-__all__ = [
-    "SelectionPolicy",
-    "CallableSelectionPolicy",
-    "wrap_selection_callable",
-]
-</file>
-
-<file path="src/iterative_context/serialization.py">
-from __future__ import annotations
-
-from typing import Any, cast
-
-from iterative_context.graph_models import Graph, GraphEdge, GraphNode
-
-
-def _unwrap_node(data: Any) -> tuple[GraphNode, dict[str, Any]]:
-    if isinstance(data, dict) and "data" in data:
-        typed_data = cast(dict[str, Any], data)
-        node = cast(GraphNode, typed_data["data"])
-        extras = {k: v for k, v in typed_data.items() if k != "data"}
-        return node, extras
-    if isinstance(data, dict):
-        typed_data = cast(dict[str, Any], data)
-        node = cast(GraphNode, typed_data)
-        return node, typed_data
-    return cast(GraphNode, data), {}
-
-
-def serialize_node(node: GraphNode, extras: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Convert a GraphNode into a JSON-serializable dict."""
-    extras = extras or {}
-    symbol_value = extras.get("symbol")
-    file_value = extras.get("file")
-
-    payload: dict[str, Any] = {
-        "id": node.id,
-        "symbol": symbol_value if isinstance(symbol_value, str) else node.id,
-        "kind": node.kind,
-        "state": node.state,
-    }
-    if isinstance(file_value, str):
-        payload["file"] = file_value
-    tokens = getattr(node, "tokens", None)
-    if tokens is not None:
-        payload["tokens"] = tokens
-    return payload
-
-
-def serialize_graph(graph: Graph, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Serialize a NetworkX graph into deterministic JSON structures."""
-    nodes: list[dict[str, Any]] = []
-    for _, data in graph.nodes(data=True):
-        node_obj, extras = _unwrap_node(data)
-        nodes.append(serialize_node(node_obj, extras))
-
-    edges: list[dict[str, Any]] = []
-    for source, target, raw_data in graph.edges(data=True):
-        edge_kind_value: str | None = None
-        typed_edge: dict[str, Any] = raw_data
-        embedded = typed_edge.get("data")
-        if isinstance(embedded, GraphEdge):
-            edge_kind_value = embedded.kind
-        else:
-            raw_kind = typed_edge.get("kind")
-            edge_kind_value = raw_kind if isinstance(raw_kind, str) else None
-        edges.append(
-            {
-                "source": cast(str, source),
-                "target": cast(str, target),
-                "type": edge_kind_value if isinstance(edge_kind_value, str) else "references",
-            }
-        )
-
-    nodes.sort(key=lambda n: n["id"])
-    edges.sort(key=lambda e: (e["source"], e["target"], e["type"]))
-
-    return {"nodes": nodes, "edges": edges, "metadata": metadata or {}}
-
-
-__all__ = ["serialize_node", "serialize_graph"]
-</file>
-
-<file path="src/iterative_context/server.py">
-# pyright: reportUnusedFunction=false
-
-from __future__ import annotations
-
-from typing import Any
-
-from mcp.server.fastmcp import FastMCP
-
-from iterative_context import exploration
-from iterative_context.serialization import serialize_node
-from iterative_context.types import SelectionCallable
-
-
-def _resolve_symbol(symbol: str) -> dict[str, Any] | None:
-    node = exploration.resolve(symbol)
-    if node is None:
-        return None
-
-    graph = exploration.get_active_graph()
-    extras: dict[str, Any] = {}
-    if graph is not None and node.id in graph.nodes:
-        raw = graph.nodes[node.id]
-        extras = {k: v for k, v in raw.items() if k != "data"}
-
-    return serialize_node(node, extras)
-
-
-def create_mcp_server(score_fn: SelectionCallable | None = None) -> FastMCP:
-    mcp = FastMCP("iterative-context", json_response=True)
-
-    @mcp.tool()  # type: ignore[misc]
-    def resolve(symbol: str) -> dict[str, Any]:
-        exploration.ensure_graph_loaded()
-        node = _resolve_symbol(symbol)
-        return {"node": node}
-
-    @mcp.tool()  # type: ignore[misc]
-    def expand(node_id: str, depth: int) -> dict[str, Any]:
-        exploration.ensure_graph_loaded()
-        graph = exploration.expand(node_id=node_id, depth=depth, score_fn=score_fn)
-        return {"graph": graph}
-
-    @mcp.tool()  # type: ignore[misc]
-    def resolve_and_expand(symbol: str, depth: int) -> dict[str, Any]:
-        exploration.ensure_graph_loaded()
-
-        node = _resolve_symbol(symbol)
-        if node is None:
-            return {"graph": {"nodes": [], "edges": [], "metadata": {}}}
-
-        return {"graph": exploration.expand(node["id"], depth=depth, score_fn=score_fn)}
-
-    return mcp
-
-
-def run_server(score_fn: SelectionCallable | None = None) -> None:
-    mcp = create_mcp_server(score_fn)
-    mcp.run(transport="stdio")
-
-
-if __name__ == "__main__":
-    run_server()
-</file>
-
-<file path="src/iterative_context/types.py">
-from __future__ import annotations
-
-from collections.abc import Callable
-
-from iterative_context.graph_models import Graph, GraphNode
-
-SelectionCallable = Callable[[GraphNode, Graph, int], float]
-
-
-__all__ = ["SelectionCallable"]
-</file>
-
 <file path=".hypothesis/constants/0da054f76284442d">
 # file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/repos.py
 # hypothesis_version: 6.151.9
@@ -589,6 +252,20 @@ __all__ = ["SelectionCallable"]
 ['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'ExpansionPolicy', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'GraphStore', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'ScoreFn', 'UpdateNodeEvent', 'compare_scorings', 'create_event_subject', 'debug_summary', 'get_frontier', 'run_traversal', 'run_with_scoring', 'score_degree', 'score_node', 'score_random', 'score_v1', 'select_next_node']
 </file>
 
+<file path=".hypothesis/constants/24ae513378f5d4b9">
+# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
+# hypothesis_version: 6.151.9
+
+['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'symbol', 'type']
+</file>
+
+<file path=".hypothesis/constants/3512881a7553cd78">
+# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
+# hypothesis_version: 6.151.9
+
+['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'symbol', 'type']
+</file>
+
 <file path=".hypothesis/constants/383f9c924987eaf1">
 # file: /home/becker/projects/iterative-context/src/iterative_context/raw_tree.py
 # hypothesis_version: 6.151.9
@@ -596,11 +273,32 @@ __all__ = ["SelectionCallable"]
 []
 </file>
 
+<file path=".hypothesis/constants/3b512d88fc2a2d11">
+# file: /home/becker/projects/iterative-context/src/iterative_context/types.py
+# hypothesis_version: 6.151.9
+
+['SelectionCallable']
+</file>
+
+<file path=".hypothesis/constants/3c0584d65958af1c">
+# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
+</file>
+
 <file path=".hypothesis/constants/3ce4b39de52f1571">
 # file: /home/becker/projects/iterative-context/src/iterative_context/normalize.py
 # hypothesis_version: 6.151.9
 
 ['call', 'calls', 'function', 'import', 'imports', 'module']
+</file>
+
+<file path=".hypothesis/constants/3db258270ee98da6">
+# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
 </file>
 
 <file path=".hypothesis/constants/3e6b3cf575de1e2d">
@@ -652,6 +350,13 @@ __all__ = ["SelectionCallable"]
 ['compare_scorings', 'run_with_scoring', 'score_v1']
 </file>
 
+<file path=".hypothesis/constants/5601d1e117c1fc34">
+# file: /home/becker/projects/iterative-context/src/iterative_context/scoring_eval.py
+# hypothesis_version: 6.151.9
+
+['choose', 'compare_scorings', 'final_graph', 'graph_steps', 'run_with_scoring', 'score_history', 'scores', 'steps']
+</file>
+
 <file path=".hypothesis/constants/57aa4c18f0a844fc">
 # file: /home/becker/projects/iterative-context/src/iterative_context/store.py
 # hypothesis_version: 6.151.9
@@ -666,11 +371,25 @@ __all__ = ["SelectionCallable"]
 ['*.py', '.venv', '__pycache__', 'call', 'called_functions', 'calls', 'functions', 'import', 'imports', 'module', 'name', 'python']
 </file>
 
+<file path=".hypothesis/constants/58c239323047b7b0">
+# file: /home/becker/projects/iterative-context/src/iterative_context/serialization.py
+# hypothesis_version: 6.151.9
+
+['data', 'edges', 'file', 'id', 'kind', 'metadata', 'nodes', 'references', 'serialize_graph', 'serialize_node', 'source', 'state', 'symbol', 'target', 'tokens', 'type']
+</file>
+
 <file path=".hypothesis/constants/58d3fceec14484db">
 # file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/snapshot_graph.py
 # hypothesis_version: 6.151.9
 
 ['GraphSnapshot', 'addEdges', 'addNodes', 'data', 'edge', 'edges', 'event', 'events', 'evidence', 'file', 'graph', 'id', 'iteration', 'kind', 'node', 'nodes', 'normalize_edge', 'normalize_event', 'normalize_graph', 'normalize_node', 'patch', 'primary', 'render_steps', 'snippet', 'source', 'startLine', 'state', 'step', 'target', 'to_event_dict', 'tokens', 'type', 'updateNode']
+</file>
+
+<file path=".hypothesis/constants/58d5b4e9df76e576">
+# file: /home/becker/projects/iterative-context/src/iterative_context/selection_policy.py
+# hypothesis_version: 6.151.9
+
+['SelectionPolicy', 'invalid score', 'load_policy_module', 'policy.py', 'score']
 </file>
 
 <file path=".hypothesis/constants/5a4d10673a16ffda">
@@ -729,6 +448,13 @@ __all__ = ["SelectionCallable"]
 ['calls', 'data', 'edges', 'file', 'id', 'imports', 'kind', 'nodes', 'primary', 'references', 'symbol']
 </file>
 
+<file path=".hypothesis/constants/95745ae7821e913c">
+# file: /home/becker/projects/iterative-context/src/iterative_context/scoring.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 1000, 'anchor', 'default_score_fn', 'pending', 'score_degree', 'score_random', 'score_v1', 'tokens']
+</file>
+
 <file path=".hypothesis/constants/9d2294939eab0a40">
 # file: /home/becker/projects/iterative-context/src/iterative_context/test_helpers/graph_dsl.py
 # hypothesis_version: 6.151.9
@@ -750,11 +476,32 @@ __all__ = ["SelectionCallable"]
 [0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'ScoreFn', 'anchor', 'data', 'get_frontier', 'id', 'pending', 'run_traversal', 'score_node', 'select_next_node', 'state', 'tokens']
 </file>
 
+<file path=".hypothesis/constants/b7399df8dfb54d7f">
+# file: /home/becker/projects/iterative-context/src/iterative_context/selection_policy.py
+# hypothesis_version: 6.151.9
+
+['SelectionPolicy', 'invalid score', 'load_policy_module', 'policy.py', 'score']
+</file>
+
+<file path=".hypothesis/constants/b75c81381467ac8f">
+# file: /home/becker/projects/iterative-context/src/iterative_context/store.py
+# hypothesis_version: 6.151.9
+
+['calls', 'data', 'edges', 'file', 'id', 'imports', 'kind', 'nodes', 'primary', 'references', 'symbol']
+</file>
+
 <file path=".hypothesis/constants/be292cd87c21bbdc">
 # file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
 # hypothesis_version: 6.151.9
 
 ['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'ExpansionPolicy', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'GraphStore', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'ScoreFn', 'UpdateNodeEvent', 'compare_scorings', 'create_event_subject', 'debug_summary', 'expand', 'get_frontier', 'resolve', 'resolve_and_expand', 'run_traversal', 'run_with_scoring', 'score_degree', 'score_node', 'score_random', 'score_v1', 'select_next_node']
+</file>
+
+<file path=".hypothesis/constants/bfe2589bcb9c445a">
+# file: /home/becker/projects/iterative-context/src/iterative_context/selection_policy.py
+# hypothesis_version: 6.151.9
+
+['SelectionPolicy', 'invalid score']
 </file>
 
 <file path=".hypothesis/constants/c5498bdbc490567f">
@@ -792,11 +539,32 @@ __all__ = ["SelectionCallable"]
 [0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'ScoreFn', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
 </file>
 
+<file path=".hypothesis/constants/d4e524a60be919bc">
+# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
+# hypothesis_version: 6.151.9
+
+['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'symbol', 'type']
+</file>
+
+<file path=".hypothesis/constants/dc9f1dcaf34c53f5">
+# file: /home/becker/projects/iterative-context/src/iterative_context/scoring_eval.py
+# hypothesis_version: 6.151.9
+
+['choose', 'compare_scorings', 'final_graph', 'graph_steps', 'run_with_scoring', 'score_history', 'scores', 'steps']
+</file>
+
 <file path=".hypothesis/constants/e0bdcb89eae21da2">
 # file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
 # hypothesis_version: 6.151.9
 
 ['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'GraphStore', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'UpdateNodeEvent', 'compare_scorings', 'create_event_subject', 'debug_summary', 'expand', 'refine', 'resolve', 'resolve_and_expand', 'run_with_scoring', 'score_degree', 'score_random', 'score_v1']
+</file>
+
+<file path=".hypothesis/constants/e15096283a36eedb">
+# file: /home/becker/projects/iterative-context/src/iterative_context/types.py
+# hypothesis_version: 6.151.9
+
+['ScoreFn', 'SelectionCallable']
 </file>
 
 <file path=".hypothesis/constants/e2ba7639c97a97c8">
@@ -827,6 +595,20 @@ __all__ = ["SelectionCallable"]
 ['AddEdgesEvent', 'AddNodesEvent', 'AnchorNode', 'Evidence', 'ExpansionPolicy', 'Graph', 'GraphEdge', 'GraphEvent', 'GraphNode', 'IterationEvent', 'PendingNode', 'PrunedNode', 'ResolvedNode', 'ScoreFn', 'UpdateNodeEvent', 'compare_scorings', 'create_event_subject', 'get_frontier', 'run_traversal', 'run_with_scoring', 'score_degree', 'score_node', 'score_random', 'score_v1', 'select_next_node']
 </file>
 
+<file path=".hypothesis/constants/ed26139e2d297362">
+# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
+</file>
+
+<file path=".hypothesis/constants/ed532b0e7fb4c6c5">
+# file: /home/becker/projects/iterative-context/src/iterative_context/traversal.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.1, 0.5, 5.0, 10.0, 'ExpansionPolicy', 'anchor', 'data', 'get_frontier', 'graph_steps', 'id', 'last_scores', 'pending', 'run_traversal', 'score', 'score_history', 'score_node', 'select_next_node', 'state', 'tokens']
+</file>
+
 <file path=".hypothesis/constants/ed75a52dd5586707">
 # file: /home/becker/projects/iterative-context/src/iterative_context/graph_models.py
 # hypothesis_version: 6.151.9
@@ -839,6 +621,13 @@ __all__ = ["SelectionCallable"]
 # hypothesis_version: 6.151.9
 
 ['compare_scorings', 'final_graph', 'graph_steps', 'run_with_scoring', 'score_history', 'score_v1', 'scores', 'steps']
+</file>
+
+<file path=".hypothesis/constants/f901122776c6e35d">
+# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
+# hypothesis_version: 6.151.9
+
+['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'symbol', 'type']
 </file>
 
 <file path=".hypothesis/constants/fbeac6778bc9b54f">
@@ -5341,52 +5130,215 @@ class RawTree(BaseModel):
     files: list[RawFile]
 </file>
 
-<file path="src/iterative_context/scoring.py">
-# iterative-context/src/iterative_context/scoring.py
+<file path="src/iterative_context/selection_policy.py">
+from __future__ import annotations
+
+import math
+from collections.abc import Sequence
+from typing import Protocol
+
+from iterative_context.graph_models import Graph, GraphNode
+from iterative_context.types import SelectionCallable
+
+
+class SelectionPolicy(Protocol):
+    """Deterministic selection policy interface."""
+
+    def score(self, node: GraphNode, graph: Graph, step: int) -> float:
+        ...
+
+    def choose(self, candidates: Sequence[GraphNode], graph: Graph, step: int) -> GraphNode:
+        ...
+
+
+class CallableSelectionPolicy:
+    """Adapter to treat a plain scoring function as a selection policy."""
+
+    def __init__(self, fn: SelectionCallable):
+        self._fn = fn
+
+    def score(self, node: GraphNode, graph: Graph, step: int) -> float:
+        try:
+            value: object = self._fn(node, graph, step)
+        except Exception as e:  # pragma: no cover - defensive guard
+            raise RuntimeError(f"Policy crashed: {e}") from e
+
+        if not isinstance(value, (int, float)):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise ValueError("score must be numeric")
+
+        numeric = float(value)
+
+        if math.isnan(numeric) or math.isinf(numeric):
+            raise ValueError("invalid score")
+
+        return numeric
+
+    def choose(self, candidates: Sequence[GraphNode], graph: Graph, step: int) -> GraphNode:
+        return max(candidates, key=lambda n: (self.score(n, graph, step), n.id))
+
+
+def wrap_selection_callable(fn: SelectionCallable) -> CallableSelectionPolicy:
+    return CallableSelectionPolicy(fn)
+
+
+__all__ = [
+    "SelectionPolicy",
+    "CallableSelectionPolicy",
+    "wrap_selection_callable",
+]
+</file>
+
+<file path="src/iterative_context/serialization.py">
+from __future__ import annotations
+
+from typing import Any, cast
+
+from iterative_context.graph_models import Graph, GraphEdge, GraphNode
+
+
+def _unwrap_node(data: Any) -> tuple[GraphNode, dict[str, Any]]:
+    if isinstance(data, dict) and "data" in data:
+        typed_data = cast(dict[str, Any], data)
+        node = cast(GraphNode, typed_data["data"])
+        extras = {k: v for k, v in typed_data.items() if k != "data"}
+        return node, extras
+    if isinstance(data, dict):
+        typed_data = cast(dict[str, Any], data)
+        node = cast(GraphNode, typed_data)
+        return node, typed_data
+    return cast(GraphNode, data), {}
+
+
+def serialize_node(node: GraphNode, extras: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Convert a GraphNode into a JSON-serializable dict."""
+    extras = extras or {}
+    symbol_value = extras.get("symbol")
+    file_value = extras.get("file")
+
+    payload: dict[str, Any] = {
+        "id": node.id,
+        "symbol": symbol_value if isinstance(symbol_value, str) else node.id,
+        "kind": node.kind,
+        "state": node.state,
+    }
+    if isinstance(file_value, str):
+        payload["file"] = file_value
+    tokens = getattr(node, "tokens", None)
+    if tokens is not None:
+        payload["tokens"] = tokens
+    return payload
+
+
+def serialize_graph(graph: Graph, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Serialize a NetworkX graph into deterministic JSON structures."""
+    nodes: list[dict[str, Any]] = []
+    for _, data in graph.nodes(data=True):
+        node_obj, extras = _unwrap_node(data)
+        nodes.append(serialize_node(node_obj, extras))
+
+    edges: list[dict[str, Any]] = []
+    for source, target, raw_data in graph.edges(data=True):
+        edge_kind_value: str | None = None
+        typed_edge: dict[str, Any] = raw_data
+        embedded = typed_edge.get("data")
+        if isinstance(embedded, GraphEdge):
+            edge_kind_value = embedded.kind
+        else:
+            raw_kind = typed_edge.get("kind")
+            edge_kind_value = raw_kind if isinstance(raw_kind, str) else None
+        edges.append(
+            {
+                "source": cast(str, source),
+                "target": cast(str, target),
+                "type": edge_kind_value if isinstance(edge_kind_value, str) else "references",
+            }
+        )
+
+    nodes.sort(key=lambda n: n["id"])
+    edges.sort(key=lambda e: (e["source"], e["target"], e["type"]))
+
+    return {"nodes": nodes, "edges": edges, "metadata": metadata or {}}
+
+
+__all__ = ["serialize_node", "serialize_graph"]
+</file>
+
+<file path="src/iterative_context/server.py">
+# pyright: reportUnusedFunction=false
 
 from __future__ import annotations
 
-import hashlib
+from typing import Any
+
+from mcp.server.fastmcp import FastMCP
+
+from iterative_context import exploration
+from iterative_context.serialization import serialize_node
+from iterative_context.types import SelectionCallable
+
+
+def _resolve_symbol(symbol: str) -> dict[str, Any] | None:
+    node = exploration.resolve(symbol)
+    if node is None:
+        return None
+
+    graph = exploration.get_active_graph()
+    extras: dict[str, Any] = {}
+    if graph is not None and node.id in graph.nodes:
+        raw = graph.nodes[node.id]
+        extras = {k: v for k, v in raw.items() if k != "data"}
+
+    return serialize_node(node, extras)
+
+
+def create_mcp_server(score_fn: SelectionCallable | None = None) -> FastMCP:
+    mcp = FastMCP("iterative-context", json_response=True)
+
+    @mcp.tool()  # type: ignore[misc]
+    def resolve(symbol: str) -> dict[str, Any]:
+        exploration.ensure_graph_loaded()
+        node = _resolve_symbol(symbol)
+        return {"node": node}
+
+    @mcp.tool()  # type: ignore[misc]
+    def expand(node_id: str, depth: int) -> dict[str, Any]:
+        exploration.ensure_graph_loaded()
+        graph = exploration.expand(node_id=node_id, depth=depth, score_fn=score_fn)
+        return {"graph": graph}
+
+    @mcp.tool()  # type: ignore[misc]
+    def resolve_and_expand(symbol: str, depth: int) -> dict[str, Any]:
+        exploration.ensure_graph_loaded()
+
+        node = _resolve_symbol(symbol)
+        if node is None:
+            return {"graph": {"nodes": [], "edges": [], "metadata": {}}}
+
+        return {"graph": exploration.expand(node["id"], depth=depth, score_fn=score_fn)}
+
+    return mcp
+
+
+def run_server(score_fn: SelectionCallable | None = None) -> None:
+    mcp = create_mcp_server(score_fn)
+    mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    run_server()
+</file>
+
+<file path="src/iterative_context/types.py">
+from __future__ import annotations
+
+from collections.abc import Callable
 
 from iterative_context.graph_models import Graph, GraphNode
 
-
-def score_v1(node: GraphNode, graph: Graph, step: int) -> float:
-    """Baseline scoring function."""
-    score = 0.0
-
-    if node.state == "pending":
-        score += 5.0
-    if node.state == "anchor":
-        score += 10.0
-
-    degree = graph.in_degree(node.id) + graph.out_degree(node.id)
-    score += degree * 0.5
-
-    tokens = getattr(node, "tokens", None)
-    if tokens is not None:
-        score += min(tokens, 50) * 0.1
-
-    return score
+SelectionCallable = Callable[[GraphNode, Graph, int], float]
 
 
-def score_degree(node: GraphNode, graph: Graph, step: int) -> float:
-    """Degree-only baseline."""
-    return graph.in_degree(node.id) + graph.out_degree(node.id)
-
-
-def score_random(node: GraphNode, graph: Graph, step: int) -> float:
-    """Deterministic pseudo-random baseline."""
-    key = f"{node.id}-{step}".encode()
-    return int(hashlib.md5(key).hexdigest(), 16) % 1000
-
-
-def default_score_fn(node: GraphNode, graph: Graph, step: int) -> float:
-    """Default scoring entrypoint."""
-    return score_v1(node, graph, step)
-
-
-__all__ = ["score_v1", "score_degree", "score_random", "default_score_fn"]
+__all__ = ["SelectionCallable"]
 </file>
 
 <file path="tests/snapshots/test_expansion/test_expand_idempotent/graph">
@@ -6312,110 +6264,6 @@ __all__ = ["score_v1", "score_degree", "score_random", "default_score_fn"]
     }
   ]
 }
-</file>
-
-<file path="tests/test_expand_invariants.py">
-"""Invariant tests for expand() output."""
-
-# pyright: reportPrivateUsage=false
-
-from __future__ import annotations
-
-import copy
-from typing import Any
-
-import hypothesis.strategies as st
-from hypothesis import given
-
-from iterative_context.exploration import _set_active_graph, expand
-from iterative_context.test_helpers.graph_dsl import build_graph
-from iterative_context.test_helpers.snapshot_graph import normalize_graph
-
-
-def _make_chain(length: int) -> Any:
-    nodes: list[dict[str, str]] = [
-        {"id": chr(ord("A") + i), "kind": "symbol", "state": "pending"} for i in range(length)
-    ]
-    edges: list[dict[str, str]] = []
-    for i in range(length - 1):
-        edges.append({"source": nodes[i]["id"], "target": nodes[i + 1]["id"], "kind": "calls"})
-    return {"nodes": nodes, "edges": edges}
-
-
-@given(st.sampled_from([_make_chain(1), _make_chain(2), _make_chain(3)]))
-def test_expand_deterministic(spec: Any) -> None:
-    graph = build_graph(spec)  # type: ignore[arg-type]
-    _set_active_graph(graph)
-
-    out1 = expand(spec["nodes"][0]["id"], depth=2)
-    out2 = expand(spec["nodes"][0]["id"], depth=2)
-
-    assert out1 == out2
-
-
-def test_expand_idempotent() -> None:
-    spec = _make_chain(2)
-    graph = build_graph(spec)  # type: ignore[arg-type]
-    _set_active_graph(graph)
-
-    before = normalize_graph(graph)
-    _ = expand("A", depth=2)
-    after = normalize_graph(graph)
-
-    assert before == after
-
-
-def test_expand_locality() -> None:
-    spec = _make_chain(2)
-    base_graph = build_graph(spec)  # type: ignore[arg-type]
-    _set_active_graph(base_graph)
-    base_snapshot = expand("A", depth=2)
-
-    expanded_graph = copy.deepcopy(base_graph)
-    expanded_graph.add_node("Z", kind="symbol", state="pending")
-    _set_active_graph(expanded_graph)
-    noisy_snapshot = expand("A", depth=2)
-
-    assert base_snapshot == noisy_snapshot
-
-
-def test_expand_respects_depth() -> None:
-    spec = _make_chain(3)
-    graph = build_graph(spec)  # type: ignore[arg-type]
-    _set_active_graph(graph)
-
-    depth_one = expand("A", depth=1)
-    depth_two = expand("A", depth=2)
-
-    nodes_one = {n["id"] for n in depth_one["nodes"]}
-    nodes_two = {n["id"] for n in depth_two["nodes"]}
-
-    assert nodes_two.issuperset(nodes_one)
-    assert "C" not in nodes_one
-    assert "C" in nodes_two
-
-
-def test_expand_no_dangling_edges() -> None:
-    spec = _make_chain(3)
-    graph = build_graph(spec)  # type: ignore[arg-type]
-    _set_active_graph(graph)
-
-    snapshot = expand("A", depth=2)
-    node_ids = {n["id"] for n in snapshot["nodes"]}
-    for edge in snapshot["edges"]:
-        assert edge["source"] in node_ids
-        assert edge["target"] in node_ids
-
-
-def test_expand_reports_metadata() -> None:
-    graph = build_graph(_make_chain(2))  # type: ignore[arg-type]
-    _set_active_graph(graph)
-
-    snapshot = expand("A", depth=3)
-
-    metadata = snapshot.get("metadata", {})
-    assert metadata["depth"] == 3
-    assert metadata["expanded_from"] == "A"
 </file>
 
 <file path="tests/test_expansion_metamorphic.py">
@@ -7801,223 +7649,6 @@ def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
     return RawTree(files=files)
 </file>
 
-<file path="src/iterative_context/exploration.py">
-# pyright: reportUnusedFunction=false
-
-from __future__ import annotations
-
-import hashlib
-from copy import deepcopy
-from pathlib import Path
-from typing import Literal, TypedDict, cast
-
-from iterative_context.graph_models import Graph, GraphEdge, GraphNode, PendingNode
-from iterative_context.injest.llm_tldr_adapter import ingest_repo
-from iterative_context.normalize import raw_tree_to_graph
-from iterative_context.scoring import default_score_fn
-from iterative_context.serialization import serialize_graph
-from iterative_context.store import GraphStore
-from iterative_context.traversal import DefaultExpansionPolicy, run_traversal
-from iterative_context.types import SelectionCallable
-
-
-class GraphSnapshotDict(TypedDict):
-    nodes: list[dict[str, object]]
-    edges: list[dict[str, object]]
-    metadata: dict[str, object]
-
-_active_graph: Graph | None = None
-_active_store: GraphStore | None = None
-_graph_signature: str | None = None
-
-
-def _set_active_graph(graph: Graph) -> None:  # noqa: PLW0603
-    global _active_graph, _active_store  # noqa: PLW0603
-    _active_graph = graph
-    _active_store = GraphStore(graph)
-
-
-def get_active_graph() -> Graph | None:
-    """Return the currently loaded graph, if any."""
-    return _active_graph
-
-
-def _repo_signature(root: Path) -> str:
-    """Compute a deterministic signature of Python sources under root."""
-    hasher = hashlib.sha256()
-    for path in sorted(root.rglob("*.py")):
-        if ".venv" in path.parts or "__pycache__" in path.parts:
-            continue
-        try:
-            stat = path.stat()
-        except FileNotFoundError:
-            continue
-        hasher.update(str(path.relative_to(root)).encode())
-        hasher.update(str(stat.st_mtime_ns).encode())
-        hasher.update(str(stat.st_size).encode())
-    return hasher.hexdigest()
-
-
-def _normalize_kind(raw: str | None) -> Literal["symbol", "function", "file", "type"]:
-    if raw == "function":
-        return "function"
-    if raw == "file":
-        return "file"
-    if raw == "type":
-        return "type"
-    return "symbol"
-
-
-def _normalize_edge_kind(raw: str | None) -> Literal["calls", "imports", "references"]:
-    if raw == "imports":
-        return "imports"
-    if raw == "calls":
-        return "calls"
-    return "references"
-
-
-def _build_graph_from_repo(root: Path) -> Graph:
-    raw_tree = ingest_repo(root)
-    base_graph = raw_tree_to_graph(raw_tree)
-
-    graph = Graph()
-    for node_id, raw_data in base_graph.nodes(data=True):
-        symbol_value: str | None = None
-        file_value: str | None = None
-        kind_value: str | None = None
-        if isinstance(raw_data, dict):
-            typed_data = cast(dict[str, object], raw_data)
-            symbol_raw = typed_data.get("symbol")
-            if isinstance(symbol_raw, str):
-                symbol_value = symbol_raw
-            file_raw = typed_data.get("file")
-            if isinstance(file_raw, str):
-                file_value = file_raw
-            kind_raw = typed_data.get("type")
-            kind_value = kind_raw if isinstance(kind_raw, str) else None
-
-        node = PendingNode(id=str(node_id), kind=_normalize_kind(kind_value))
-        attrs: dict[str, object] = {"data": node}
-        if isinstance(symbol_value, str):
-            attrs["symbol"] = symbol_value
-        if isinstance(file_value, str):
-            attrs["file"] = file_value
-        graph.add_node(node.id, **attrs)
-
-    for src, dst, raw_data in base_graph.edges(data=True):
-        typed_edge = cast(dict[str, object], raw_data)
-        embedded = typed_edge.get("data")
-        if isinstance(embedded, GraphEdge):
-            edge_kind = embedded.kind
-        else:
-            raw_kind = typed_edge.get("kind")
-            edge_kind = raw_kind if isinstance(raw_kind, str) else None
-        kind = _normalize_edge_kind(edge_kind)
-        edge = GraphEdge(source=str(src), target=str(dst), kind=kind)
-        graph.add_edge(edge.source, edge.target, data=edge)
-
-    return graph
-
-
-def ensure_graph_loaded() -> None:
-    """Idempotently load the active graph from the current repository."""
-    global _graph_signature  # noqa: PLW0603
-    root = Path.cwd()
-    signature = _repo_signature(root)
-
-    if _active_graph is not None and signature == _graph_signature:
-        return
-
-    graph = _build_graph_from_repo(root)
-    _graph_signature = signature
-    _set_active_graph(graph)
-
-
-def resolve(symbol: str) -> GraphNode | None:
-    """Public resolve: pure lookup via the active store."""
-    if _active_store is None:
-        return None
-    return _active_store.resolve(symbol)
-
-
-def expand(
-    node_id: str,
-    depth: int = 1,
-    score_fn: SelectionCallable | None = None,
-) -> GraphSnapshotDict:
-    """
-    Deterministic bounded expansion using internal traversal.
-
-    Returns a normalized GraphSnapshot (dict) of the explored subgraph.
-    """
-    if _active_graph is None:
-        return cast(
-            GraphSnapshotDict,
-            {"nodes": [], "edges": [], "metadata": {"depth": depth, "expanded_from": node_id}},
-        )
-
-    # Limit traversal to the connected neighborhood to avoid unrelated drift.
-    base_reachable: set[str] = set()
-    queue: list[tuple[str, int]] = [(node_id, 0)]
-    while queue:
-        current, dist = queue.pop(0)
-        if current in base_reachable:
-            continue
-        base_reachable.add(current)
-        if dist >= depth:
-            continue
-        for succ in _active_graph.successors(current):
-            queue.append((cast(str, succ), dist + 1))
-        for pred in _active_graph.predecessors(current):
-            queue.append((cast(str, pred), dist + 1))
-
-    working = cast(Graph, deepcopy(_active_graph.subgraph(base_reachable).copy()))
-    steps = max(depth, 0)
-
-    run_traversal(
-        working,
-        steps=steps,
-        expansion_policy=DefaultExpansionPolicy(),
-        score_fn=score_fn or default_score_fn,
-    )
-
-    visited: set[str] = set()
-    frontier: list[tuple[str, int]] = [(node_id, 0)]
-    while frontier:
-        current, dist = frontier.pop(0)
-        if current in visited:
-            continue
-        visited.add(current)
-        if dist >= steps:
-            continue
-        for succ in working.successors(current):
-            frontier.append((cast(str, succ), dist + 1))
-        for pred in working.predecessors(current):
-            frontier.append((cast(str, pred), dist + 1))
-
-    subgraph = cast(Graph, working.subgraph(visited).copy())
-    return cast(
-        GraphSnapshotDict,
-        serialize_graph(subgraph, metadata={"depth": depth, "expanded_from": node_id}),
-    )
-
-
-def expand_with_policy(node_id: str, depth: int, score_fn: SelectionCallable) -> GraphSnapshotDict:
-    return expand(node_id=node_id, depth=depth, score_fn=score_fn)
-
-
-def resolve_and_expand(
-    symbol: str,
-    depth: int = 1,
-    score_fn: SelectionCallable | None = None,
-) -> GraphSnapshotDict:
-    """Composition only: resolve first, then expand deterministically."""
-    node = resolve(symbol)
-    if node is None:
-        return cast(GraphSnapshotDict, {"nodes": [], "edges": [], "metadata": {}})
-    return expand(node.id, depth=depth, score_fn=score_fn)
-</file>
-
 <file path="src/iterative_context/graph_models.py">
 # iterative-context/graph_models.py
 
@@ -8193,198 +7824,156 @@ def raw_tree_to_graph(tree: RawTree) -> Graph:
     return graph
 </file>
 
-<file path="src/iterative_context/scoring_eval.py">
+<file path="src/iterative_context/scoring.py">
+# iterative-context/src/iterative_context/scoring.py
+
 from __future__ import annotations
 
-from collections.abc import Callable
+import hashlib
 
-from iterative_context.graph_models import Graph
-from iterative_context.scoring import default_score_fn
-from iterative_context.traversal import DefaultExpansionPolicy, run_traversal
-from iterative_context.types import SelectionCallable
+from iterative_context.graph_models import Graph, GraphNode
 
 
-def run_with_scoring(
-    graph_factory: Callable[[], Graph],
-    score_fn: SelectionCallable | None,
-    steps: int,
-) -> Graph:
-    """Execute traversal with an injected scoring callable."""
-    graph = graph_factory()
-    return run_traversal(
-        graph,
-        steps=steps,
-        expansion_policy=DefaultExpansionPolicy(),
-        score_fn=score_fn or default_score_fn,
-    )
+def score_v1(node: GraphNode, graph: Graph, step: int) -> float:
+    """Baseline scoring function."""
+    score = 0.0
+
+    if node.state == "pending":
+        score += 5.0
+    if node.state == "anchor":
+        score += 10.0
+
+    degree = graph.in_degree(node.id) + graph.out_degree(node.id)
+    score += degree * 0.5
+
+    tokens = getattr(node, "tokens", None)
+    if tokens is not None:
+        score += min(tokens, 50) * 0.1
+
+    return score
 
 
-__all__ = ["run_with_scoring"]
+def score_degree(node: GraphNode, graph: Graph, step: int) -> float:
+    """Degree-only baseline."""
+    return graph.in_degree(node.id) + graph.out_degree(node.id)
+
+
+def score_random(node: GraphNode, graph: Graph, step: int) -> float:
+    """Deterministic pseudo-random baseline."""
+    key = f"{node.id}-{step}".encode()
+    return int(hashlib.md5(key).hexdigest(), 16) % 1000
+
+
+def default_score_fn(node: GraphNode, graph: Graph, step: int) -> float:
+    """Default scoring entrypoint."""
+    return score_v1(node, graph, step)
+
+
+__all__ = ["score_v1", "score_degree", "score_random", "default_score_fn"]
 </file>
 
-<file path="src/iterative_context/store.py">
-from collections import deque
-from typing import Any, cast
+<file path="tests/test_expand_invariants.py">
+"""Invariant tests for expand() output."""
 
-from pydantic import BaseModel
+# pyright: reportPrivateUsage=false
 
-from iterative_context.graph_models import Graph, GraphEdge, GraphNode
+from __future__ import annotations
 
+import copy
+from typing import Any
 
-class GraphStore:
-    """
-    READ-ONLY PROJECTION LAYER.
+import hypothesis.strategies as st
+from hypothesis import given
 
-    This class provides indexed, queryable access to the graph.
-
-    It MUST NOT:
-    - mutate the graph
-    - emit events
-    - perform expansion
-
-    It only answers questions about the current graph state.
-    """
-
-    def __init__(self, graph: Graph):
-        self.graph = graph
-
-        self.nodes_by_id: dict[str, dict[str, Any]] = {}
-        self.nodes_by_symbol: dict[str, list[str]] = {}
-        self.nodes_by_file: dict[str, list[str]] = {}
-        self.index_by_symbol: dict[str, list[str]] = {}
-        self.index_by_file: dict[str, list[str]] = {}
-
-        self.out_edges: dict[str, list[GraphEdge]] = {}
-        self.in_edges: dict[str, list[GraphEdge]] = {}
-
-        self._build_indexes()
-
-    def _build_indexes(self) -> None:
-        for node_id, data in sorted(self.graph.nodes(data=True), key=lambda item: item[0]):
-            node_data = dict(data)
-            self.nodes_by_id[node_id] = node_data
-
-            symbol = node_data.get("symbol")
-            if isinstance(symbol, str):
-                self.nodes_by_symbol.setdefault(symbol, []).append(node_id)
-                self.index_by_symbol.setdefault(symbol, []).append(node_id)
-
-            file_value = node_data.get("file")
-            if isinstance(file_value, str):
-                self.nodes_by_file.setdefault(file_value, []).append(node_id)
-                self.index_by_file.setdefault(file_value, []).append(node_id)
-        for mapping in (
-            self.nodes_by_symbol,
-            self.nodes_by_file,
-            self.index_by_symbol,
-            self.index_by_file,
-        ):
-            for key in mapping:
-                mapping[key] = sorted(mapping[key])
-
-        for src, dst, data in sorted(
-            self.graph.edges(data=True), key=lambda item: (item[0], item[1])
-        ):
-            kind_value = data.get("kind")
-            if kind_value not in {"calls", "imports", "references"}:
-                data_obj = data.get("data")
-                if isinstance(data_obj, GraphEdge):
-                    kind_value = data_obj.kind
-            kind = kind_value if isinstance(kind_value, str) else "references"
-
-            edge = GraphEdge(
-                source=src,
-                target=dst,
-                kind=kind,  # type: ignore[arg-type]
-                id=data.get("id"),
-                primary=data.get("primary"),
-            )
-
-            self.out_edges.setdefault(src, []).append(edge)
-            self.in_edges.setdefault(dst, []).append(edge)
-
-    def find_symbol(self, symbol: str) -> list[str]:
-        return list(self.nodes_by_symbol.get(symbol, []))
-
-    def _node_for_id(self, node_id: str) -> GraphNode | None:
-        data = self.graph.nodes.get(node_id)
-        if data is None:
-            return None
-        if "data" in data:
-            inner = data.get("data")
-            if isinstance(inner, BaseModel):
-                return cast(GraphNode, inner)
-        if isinstance(data, BaseModel):
-            return cast(GraphNode, data)
-        return None
-
-    def resolve(self, query: str) -> GraphNode | None:
-        """
-        Deterministic lookup using symbol/file indexes only.
-
-        No traversal or mutation.
-        """
-        exact = self.index_by_symbol.get(query, [])
-        if exact:
-            node = self._node_for_id(sorted(exact)[0])
-            if node:
-                return node
-
-        lowered = query.lower()
-        for sym, ids in sorted(self.index_by_symbol.items(), key=lambda item: item[0]):
-            if lowered in sym.lower():
-                node = self._node_for_id(ids[0])
-                if node:
-                    return node
-
-        for path, ids in sorted(self.index_by_file.items(), key=lambda item: item[0]):
-            if lowered in path.lower():
-                node = self._node_for_id(ids[0])
-                if node:
-                    return node
-
-        return None
-
-    def get_neighbors(self, node_id: str, kinds: list[str] | None = None) -> list[str]:
-        neighbors: set[str] = set()
-
-        for edge in self.out_edges.get(node_id, []):
-            if kinds is None or edge.kind in kinds:
-                neighbors.add(edge.target)
-
-        for edge in self.in_edges.get(node_id, []):
-            if kinds is None or edge.kind in kinds:
-                neighbors.add(edge.source)
-
-        return sorted(neighbors)
-
-    def get_neighborhood(self, node_id: str, radius: int) -> set[str]:
-        if radius < 0:
-            return set()
-
-        visited: set[str] = set()
-        queue: deque[tuple[str, int]] = deque()
-        queue.append((node_id, 0))
-        visited.add(node_id)
-
-        while queue:
-            current, dist = queue.popleft()
-            if dist >= radius:
-                continue
-
-            for neighbor in self.get_neighbors(current):
-                if neighbor not in visited:
-                    visited.add(neighbor)
-                    queue.append((neighbor, dist + 1))
-
-        return visited
+from iterative_context.exploration import _set_active_graph, expand
+from iterative_context.test_helpers.graph_dsl import build_graph
+from iterative_context.test_helpers.snapshot_graph import normalize_graph
 
 
-def debug_summary(store: GraphStore) -> dict[str, int]:
-    return {
-        "nodes": len(store.nodes_by_id),
-        "edges": sum(len(v) for v in store.out_edges.values()),
-    }
+def _make_chain(length: int) -> Any:
+    nodes: list[dict[str, str]] = [
+        {"id": chr(ord("A") + i), "kind": "symbol", "state": "pending"} for i in range(length)
+    ]
+    edges: list[dict[str, str]] = []
+    for i in range(length - 1):
+        edges.append({"source": nodes[i]["id"], "target": nodes[i + 1]["id"], "kind": "calls"})
+    return {"nodes": nodes, "edges": edges}
+
+
+@given(st.sampled_from([_make_chain(1), _make_chain(2), _make_chain(3)]))
+def test_expand_deterministic(spec: Any) -> None:
+    graph = build_graph(spec)  # type: ignore[arg-type]
+    _set_active_graph(graph)
+
+    out1 = expand(spec["nodes"][0]["id"], depth=2)
+    out2 = expand(spec["nodes"][0]["id"], depth=2)
+
+    assert out1 == out2
+
+
+def test_expand_idempotent() -> None:
+    spec = _make_chain(2)
+    graph = build_graph(spec)  # type: ignore[arg-type]
+    _set_active_graph(graph)
+
+    before = normalize_graph(graph)
+    _ = expand("A", depth=2)
+    after = normalize_graph(graph)
+
+    assert before == after
+
+
+def test_expand_locality() -> None:
+    spec = _make_chain(2)
+    base_graph = build_graph(spec)  # type: ignore[arg-type]
+    _set_active_graph(base_graph)
+    base_snapshot = expand("A", depth=2)
+
+    expanded_graph = copy.deepcopy(base_graph)
+    expanded_graph.add_node("Z", kind="symbol", state="pending")
+    _set_active_graph(expanded_graph)
+    noisy_snapshot = expand("A", depth=2)
+
+    assert base_snapshot == noisy_snapshot
+
+
+def test_expand_respects_depth() -> None:
+    spec = _make_chain(3)
+    graph = build_graph(spec)  # type: ignore[arg-type]
+    _set_active_graph(graph)
+
+    depth_one = expand("A", depth=1)
+    depth_two = expand("A", depth=2)
+
+    nodes_one = {n["id"] for n in depth_one["nodes"]}
+    nodes_two = {n["id"] for n in depth_two["nodes"]}
+
+    assert nodes_two.issuperset(nodes_one)
+    assert "C" not in nodes_one
+    assert "C" in nodes_two
+
+
+def test_expand_no_dangling_edges() -> None:
+    spec = _make_chain(3)
+    graph = build_graph(spec)  # type: ignore[arg-type]
+    _set_active_graph(graph)
+
+    snapshot = expand("A", depth=2)
+    node_ids = {n["id"] for n in snapshot["nodes"]}
+    for edge in snapshot["edges"]:
+        assert edge["source"] in node_ids
+        assert edge["target"] in node_ids
+
+
+def test_expand_reports_metadata() -> None:
+    graph = build_graph(_make_chain(2))  # type: ignore[arg-type]
+    _set_active_graph(graph)
+
+    snapshot = expand("A", depth=3)
+
+    metadata = snapshot.get("metadata", {})
+    assert metadata["depth"] == 3
+    assert metadata["expanded_from"] == "A"
 </file>
 
 <file path="tests/test_expansion_vs_query.py">
@@ -8790,85 +8379,6 @@ def test_unknown_nodes_created(repo: tuple[str, Path]) -> None:
                 found_unknown = True
 
     assert found_unknown
-</file>
-
-<file path="tests/test_resolve_expand.py">
-# pyright: reportPrivateUsage=false
-
-import pytest
-
-from iterative_context.exploration import (
-    _set_active_graph,
-    expand,
-    expand_with_policy,
-    resolve,
-    resolve_and_expand,
-)
-from iterative_context.graph_models import Graph, GraphNode
-from iterative_context.test_helpers.graph_dsl import build_graph
-
-
-def make_graph_with_symbols() -> Graph:
-    graph = build_graph(
-        {
-            "nodes": [
-                {"id": "A", "kind": "symbol", "state": "pending"},
-                {"id": "B", "kind": "symbol", "state": "pending"},
-            ],
-            "edges": [
-                {"source": "A", "target": "B", "kind": "calls"},
-            ],
-        }
-    )
-    graph.nodes["A"]["symbol"] = "expand_node"
-    graph.nodes["A"]["file"] = "src/iterative_context/expansion.py"
-    graph.nodes["B"]["symbol"] = "other_symbol"
-    graph.nodes["B"]["file"] = "src/iterative_context/other.py"
-    return graph
-
-
-@pytest.fixture
-def activate_graph() -> Graph:
-    graph = make_graph_with_symbols()
-    _set_active_graph(graph)
-    return graph
-
-
-def test_resolve_symbol(activate_graph: Graph) -> None:
-    node = resolve("expand_node")
-    assert node is not None
-    assert node.id == "A"
-
-
-def test_resolve_deterministic(activate_graph: Graph) -> None:
-    node1 = resolve("expand_node")
-    node2 = resolve("expand_node")
-    assert node1 is not None and node2 is not None
-    assert node1.id == node2.id
-
-
-def test_expand_returns_snapshot(activate_graph: Graph) -> None:
-    snapshot = expand("A", depth=2)
-    assert snapshot["nodes"]
-
-
-def test_resolve_and_expand_integration(activate_graph: Graph) -> None:
-    direct_node = resolve("expand_node")
-    assert direct_node is not None
-    manual = expand(direct_node.id, depth=2)
-
-    combined = resolve_and_expand("expand_node", depth=2)
-
-    assert manual == combined
-
-
-def test_expand_with_callable_policy(activate_graph: Graph) -> None:
-    def score(node: GraphNode, graph: Graph, step: int) -> float:
-        return 1.0
-
-    result = expand_with_policy("A", depth=1, score_fn=score)
-
-    assert result is not None
 </file>
 
 <file path="flake.lock">
@@ -9364,109 +8874,415 @@ def expand_node(
 __all__ = ["expand_node"]
 </file>
 
-<file path="src/iterative_context/traversal.py">
-# iterative-context/src/iterative_context/traversal.py
+<file path="src/iterative_context/exploration.py">
+# pyright: reportUnusedFunction=false
 
 from __future__ import annotations
 
-import copy
-from collections.abc import Sequence
-from typing import Protocol, cast
+import hashlib
+from copy import deepcopy
+from pathlib import Path
+from typing import Literal, TypedDict, cast
 
-from iterative_context.expansion import expand_node
-from iterative_context.graph_models import Graph, GraphEvent, GraphNode
+from iterative_context.graph_models import Graph, GraphEdge, GraphNode, PendingNode
+from iterative_context.injest.llm_tldr_adapter import ingest_repo
+from iterative_context.normalize import raw_tree_to_graph
 from iterative_context.scoring import default_score_fn
-from iterative_context.selection_policy import CallableSelectionPolicy
-from iterative_context.test_helpers.graph_dsl import apply_events
+from iterative_context.serialization import serialize_graph
+from iterative_context.store import GraphStore
+from iterative_context.traversal import DefaultExpansionPolicy, run_traversal
 from iterative_context.types import SelectionCallable
 
 
-def get_frontier(graph: Graph) -> list[GraphNode]:
-    """Return pending nodes eligible for expansion, sorted deterministically by id."""
-    frontier: list[GraphNode] = []
-    for _, data in graph.nodes(data=True):
-        node = cast(GraphNode, data["data"] if isinstance(data, dict) and "data" in data else data)
-        if getattr(node, "state", None) == "pending":
-            frontier.append(node)
-    frontier.sort(key=lambda n: n.id)
-    return frontier
+class GraphSnapshotDict(TypedDict):
+    nodes: list[dict[str, object]]
+    edges: list[dict[str, object]]
+    metadata: dict[str, object]
+
+_active_graph: Graph | None = None
+_active_store: GraphStore | None = None
+_graph_signature: str | None = None
 
 
-def score_node(node: GraphNode, graph: Graph, step: int) -> float:
-    """Assign a deterministic score to a node."""
-    score = 0.0
-    if node.state == "pending":
-        score += 5.0
-    if getattr(node, "state", None) == "anchor":
-        score += 10.0
-
-    degree = graph.in_degree(node.id) + graph.out_degree(node.id)
-    score += degree * 0.5
-
-    tokens = getattr(node, "tokens", None)
-    if tokens is not None:
-        score += min(tokens, 50) * 0.1
-
-    return score
+def _set_active_graph(graph: Graph) -> None:  # noqa: PLW0603
+    global _active_graph, _active_store  # noqa: PLW0603
+    _active_graph = graph
+    _active_store = GraphStore(graph)
 
 
-def select_next_node(
-    candidates: Sequence[GraphNode],
-    graph: Graph,
-    step: int,
-    score_fn: SelectionCallable,
-) -> GraphNode:
-    """Select the best node to expand using a scoring callable."""
-    graph.graph["last_scores"] = [
-        {"id": node.id, "score": score_fn(node, graph, step)} for node in candidates
-    ]
-    return max(candidates, key=lambda n: (score_fn(n, graph, step), n.id))
+def get_active_graph() -> Graph | None:
+    """Return the currently loaded graph, if any."""
+    return _active_graph
 
 
-class ExpansionPolicy(Protocol):
-    def expand(self, node: GraphNode, graph: Graph) -> Sequence[GraphEvent]:
-        ...
+def _repo_signature(root: Path) -> str:
+    """Compute a deterministic signature of Python sources under root."""
+    hasher = hashlib.sha256()
+    for path in sorted(root.rglob("*.py")):
+        if ".venv" in path.parts or "__pycache__" in path.parts:
+            continue
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            continue
+        hasher.update(str(path.relative_to(root)).encode())
+        hasher.update(str(stat.st_mtime_ns).encode())
+        hasher.update(str(stat.st_size).encode())
+    return hasher.hexdigest()
 
 
-class DefaultExpansionPolicy:
-    def expand(self, node: GraphNode, graph: Graph) -> Sequence[GraphEvent]:
-        return expand_node(
-            {"id": node.id, "state": node.state},
-            graph,
-        )
+def _normalize_kind(raw: str | None) -> Literal["symbol", "function", "file", "type"]:
+    if raw == "function":
+        return "function"
+    if raw == "file":
+        return "file"
+    if raw == "type":
+        return "type"
+    return "symbol"
 
 
-def run_traversal(
-    graph: Graph,
-    steps: int,
-    expansion_policy: ExpansionPolicy | None = None,
-    score_fn: SelectionCallable | None = None,
-) -> Graph:
-    """Run N expansion steps using the provided scoring policy."""
-    policy_wrapper = CallableSelectionPolicy(score_fn or default_score_fn)
-    active_expansion_policy = expansion_policy or DefaultExpansionPolicy()
-    graph.graph.setdefault("graph_steps", [copy.deepcopy(graph)])
-    score_history = graph.graph.setdefault("score_history", [])
-    for step in range(steps):
-        candidates = get_frontier(graph)
-        if not candidates:
-            break
-        node = select_next_node(candidates, graph, step, policy_wrapper.score)
-        score_history.append(graph.graph.get("last_scores", []))
-        events = active_expansion_policy.expand(node, graph)
-        apply_events(graph, events)
-        graph.graph["graph_steps"].append(copy.deepcopy(graph))
+def _normalize_edge_kind(raw: str | None) -> Literal["calls", "imports", "references"]:
+    if raw == "imports":
+        return "imports"
+    if raw == "calls":
+        return "calls"
+    return "references"
+
+
+def _build_graph_from_repo(root: Path) -> Graph:
+    raw_tree = ingest_repo(root)
+    base_graph = raw_tree_to_graph(raw_tree)
+
+    graph = Graph()
+    for node_id, raw_data in base_graph.nodes(data=True):
+        symbol_value: str | None = None
+        file_value: str | None = None
+        kind_value: str | None = None
+        if isinstance(raw_data, dict):
+            typed_data = cast(dict[str, object], raw_data)
+            symbol_raw = typed_data.get("symbol")
+            if isinstance(symbol_raw, str):
+                symbol_value = symbol_raw
+            file_raw = typed_data.get("file")
+            if isinstance(file_raw, str):
+                file_value = file_raw
+            kind_raw = typed_data.get("type")
+            kind_value = kind_raw if isinstance(kind_raw, str) else None
+
+        node = PendingNode(id=str(node_id), kind=_normalize_kind(kind_value))
+        attrs: dict[str, object] = {"data": node}
+        if isinstance(symbol_value, str):
+            attrs["symbol"] = symbol_value
+        if isinstance(file_value, str):
+            attrs["file"] = file_value
+        graph.add_node(node.id, **attrs)
+
+    for src, dst, raw_data in base_graph.edges(data=True):
+        typed_edge = cast(dict[str, object], raw_data)
+        embedded = typed_edge.get("data")
+        if isinstance(embedded, GraphEdge):
+            edge_kind = embedded.kind
+        else:
+            raw_kind = typed_edge.get("kind")
+            edge_kind = raw_kind if isinstance(raw_kind, str) else None
+        kind = _normalize_edge_kind(edge_kind)
+        edge = GraphEdge(source=str(src), target=str(dst), kind=kind)
+        graph.add_edge(edge.source, edge.target, data=edge)
+
     return graph
 
 
-__all__ = [
-    "get_frontier",
-    "score_node",
-    "select_next_node",
-    "ExpansionPolicy",
-    "DefaultExpansionPolicy",
-    "run_traversal",
-]
+def ensure_graph_loaded() -> None:
+    """Idempotently load the active graph from the current repository."""
+    global _graph_signature  # noqa: PLW0603
+    root = Path.cwd()
+    signature = _repo_signature(root)
+
+    if _active_graph is not None and signature == _graph_signature:
+        return
+
+    graph = _build_graph_from_repo(root)
+    _graph_signature = signature
+    _set_active_graph(graph)
+
+
+def resolve(symbol: str) -> GraphNode | None:
+    """Public resolve: pure lookup via the active store."""
+    if _active_store is None:
+        return None
+    return _active_store.resolve(symbol)
+
+
+def expand(
+    node_id: str,
+    depth: int = 1,
+    score_fn: SelectionCallable | None = None,
+) -> GraphSnapshotDict:
+    """
+    Deterministic bounded expansion using internal traversal.
+
+    Returns a normalized GraphSnapshot (dict) of the explored subgraph.
+    """
+    if _active_graph is None:
+        return cast(
+            GraphSnapshotDict,
+            {"nodes": [], "edges": [], "metadata": {"depth": depth, "expanded_from": node_id}},
+        )
+
+    # Limit traversal to the connected neighborhood to avoid unrelated drift.
+    base_reachable: set[str] = set()
+    queue: list[tuple[str, int]] = [(node_id, 0)]
+    while queue:
+        current, dist = queue.pop(0)
+        if current in base_reachable:
+            continue
+        base_reachable.add(current)
+        if dist >= depth:
+            continue
+        for succ in _active_graph.successors(current):
+            queue.append((cast(str, succ), dist + 1))
+        for pred in _active_graph.predecessors(current):
+            queue.append((cast(str, pred), dist + 1))
+
+    working = cast(Graph, deepcopy(_active_graph.subgraph(base_reachable).copy()))
+    steps = max(depth, 0)
+
+    run_traversal(
+        working,
+        steps=steps,
+        expansion_policy=DefaultExpansionPolicy(),
+        score_fn=score_fn or default_score_fn,
+    )
+
+    visited: set[str] = set()
+    frontier: list[tuple[str, int]] = [(node_id, 0)]
+    while frontier:
+        current, dist = frontier.pop(0)
+        if current in visited:
+            continue
+        visited.add(current)
+        if dist >= steps:
+            continue
+        for succ in working.successors(current):
+            frontier.append((cast(str, succ), dist + 1))
+        for pred in working.predecessors(current):
+            frontier.append((cast(str, pred), dist + 1))
+
+    subgraph = cast(Graph, working.subgraph(visited).copy())
+    return cast(
+        GraphSnapshotDict,
+        serialize_graph(subgraph, metadata={"depth": depth, "expanded_from": node_id}),
+    )
+
+
+def expand_with_policy(node_id: str, depth: int, score_fn: SelectionCallable) -> GraphSnapshotDict:
+    return expand(node_id=node_id, depth=depth, score_fn=score_fn)
+
+
+def resolve_and_expand(
+    symbol: str,
+    depth: int = 1,
+    score_fn: SelectionCallable | None = None,
+) -> GraphSnapshotDict:
+    """Composition only: resolve first, then expand deterministically."""
+    node = resolve(symbol)
+    if node is None:
+        return cast(GraphSnapshotDict, {"nodes": [], "edges": [], "metadata": {}})
+    return expand(node.id, depth=depth, score_fn=score_fn)
+</file>
+
+<file path="src/iterative_context/scoring_eval.py">
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from iterative_context.graph_models import Graph
+from iterative_context.scoring import default_score_fn
+from iterative_context.traversal import DefaultExpansionPolicy, run_traversal
+from iterative_context.types import SelectionCallable
+
+
+def run_with_scoring(
+    graph_factory: Callable[[], Graph],
+    score_fn: SelectionCallable | None,
+    steps: int,
+) -> Graph:
+    """Execute traversal with an injected scoring callable."""
+    graph = graph_factory()
+    return run_traversal(
+        graph,
+        steps=steps,
+        expansion_policy=DefaultExpansionPolicy(),
+        score_fn=score_fn or default_score_fn,
+    )
+
+
+__all__ = ["run_with_scoring"]
+</file>
+
+<file path="src/iterative_context/store.py">
+from collections import deque
+from typing import Any, cast
+
+from pydantic import BaseModel
+
+from iterative_context.graph_models import Graph, GraphEdge, GraphNode
+
+
+class GraphStore:
+    """
+    READ-ONLY PROJECTION LAYER.
+
+    This class provides indexed, queryable access to the graph.
+
+    It MUST NOT:
+    - mutate the graph
+    - emit events
+    - perform expansion
+
+    It only answers questions about the current graph state.
+    """
+
+    def __init__(self, graph: Graph):
+        self.graph = graph
+
+        self.nodes_by_id: dict[str, dict[str, Any]] = {}
+        self.nodes_by_symbol: dict[str, list[str]] = {}
+        self.nodes_by_file: dict[str, list[str]] = {}
+        self.index_by_symbol: dict[str, list[str]] = {}
+        self.index_by_file: dict[str, list[str]] = {}
+
+        self.out_edges: dict[str, list[GraphEdge]] = {}
+        self.in_edges: dict[str, list[GraphEdge]] = {}
+
+        self._build_indexes()
+
+    def _build_indexes(self) -> None:
+        for node_id, data in sorted(self.graph.nodes(data=True), key=lambda item: item[0]):
+            node_data = dict(data)
+            self.nodes_by_id[node_id] = node_data
+
+            symbol = node_data.get("symbol")
+            if isinstance(symbol, str):
+                self.nodes_by_symbol.setdefault(symbol, []).append(node_id)
+                self.index_by_symbol.setdefault(symbol, []).append(node_id)
+
+            file_value = node_data.get("file")
+            if isinstance(file_value, str):
+                self.nodes_by_file.setdefault(file_value, []).append(node_id)
+                self.index_by_file.setdefault(file_value, []).append(node_id)
+        for mapping in (
+            self.nodes_by_symbol,
+            self.nodes_by_file,
+            self.index_by_symbol,
+            self.index_by_file,
+        ):
+            for key in mapping:
+                mapping[key] = sorted(mapping[key])
+
+        for src, dst, data in sorted(
+            self.graph.edges(data=True), key=lambda item: (item[0], item[1])
+        ):
+            kind_value = data.get("kind")
+            if kind_value not in {"calls", "imports", "references"}:
+                data_obj = data.get("data")
+                if isinstance(data_obj, GraphEdge):
+                    kind_value = data_obj.kind
+            kind = kind_value if isinstance(kind_value, str) else "references"
+
+            edge = GraphEdge(
+                source=src,
+                target=dst,
+                kind=kind,  # type: ignore[arg-type]
+                id=data.get("id"),
+                primary=data.get("primary"),
+            )
+
+            self.out_edges.setdefault(src, []).append(edge)
+            self.in_edges.setdefault(dst, []).append(edge)
+
+    def find_symbol(self, symbol: str) -> list[str]:
+        return list(self.nodes_by_symbol.get(symbol, []))
+
+    def _node_for_id(self, node_id: str) -> GraphNode | None:
+        data = self.graph.nodes.get(node_id)
+        if data is None:
+            return None
+        if "data" in data:
+            inner = data.get("data")
+            if isinstance(inner, BaseModel):
+                return cast(GraphNode, inner)
+        if isinstance(data, BaseModel):
+            return cast(GraphNode, data)
+        return None
+
+    def resolve(self, query: str) -> GraphNode | None:
+        """
+        Deterministic lookup using symbol/file indexes only.
+
+        No traversal or mutation.
+        """
+        exact = self.index_by_symbol.get(query, [])
+        if exact:
+            node = self._node_for_id(sorted(exact)[0])
+            if node:
+                return node
+
+        lowered = query.lower()
+        for sym, ids in sorted(self.index_by_symbol.items(), key=lambda item: item[0]):
+            if lowered in sym.lower():
+                node = self._node_for_id(ids[0])
+                if node:
+                    return node
+
+        for path, ids in sorted(self.index_by_file.items(), key=lambda item: item[0]):
+            if lowered in path.lower():
+                node = self._node_for_id(ids[0])
+                if node:
+                    return node
+
+        return None
+
+    def get_neighbors(self, node_id: str, kinds: list[str] | None = None) -> list[str]:
+        neighbors: set[str] = set()
+
+        for edge in self.out_edges.get(node_id, []):
+            if kinds is None or edge.kind in kinds:
+                neighbors.add(edge.target)
+
+        for edge in self.in_edges.get(node_id, []):
+            if kinds is None or edge.kind in kinds:
+                neighbors.add(edge.source)
+
+        return sorted(neighbors)
+
+    def get_neighborhood(self, node_id: str, radius: int) -> set[str]:
+        if radius < 0:
+            return set()
+
+        visited: set[str] = set()
+        queue: deque[tuple[str, int]] = deque()
+        queue.append((node_id, 0))
+        visited.add(node_id)
+
+        while queue:
+            current, dist = queue.popleft()
+            if dist >= radius:
+                continue
+
+            for neighbor in self.get_neighbors(current):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append((neighbor, dist + 1))
+
+        return visited
+
+
+def debug_summary(store: GraphStore) -> dict[str, int]:
+    return {
+        "nodes": len(store.nodes_by_id),
+        "edges": sum(len(v) for v in store.out_edges.values()),
+    }
 </file>
 
 <file path="tests/conftest.py">
@@ -9812,106 +9628,83 @@ def test_edge_and_events(snapshot_graph: GraphSnapshot, snapshot: Snapshot):
     snapshot.assert_match(rendered_steps, "event_graph_steps")
 </file>
 
-<file path="tests/test_traversal_selection.py">
+<file path="tests/test_resolve_expand.py">
 # pyright: reportPrivateUsage=false
-
-from typing import cast
 
 import pytest
 
+from iterative_context.exploration import (
+    _set_active_graph,
+    expand,
+    expand_with_policy,
+    resolve,
+    resolve_and_expand,
+)
 from iterative_context.graph_models import Graph, GraphNode
-from iterative_context.scoring import default_score_fn
-from iterative_context.test_helpers import build_graph, normalize_graph
-from iterative_context.traversal import run_traversal
-from iterative_context.types import SelectionCallable
+from iterative_context.test_helpers.graph_dsl import build_graph
 
 
-def test_traversal_changes_with_policy() -> None:
-    base_spec = {
-        "nodes": [
-            {"id": "A", "kind": "symbol", "state": "pending"},
-            {"id": "B", "kind": "symbol", "state": "pending"},
-        ],
-        "edges": [],
-    }
-
-    graph_a = build_graph(base_spec)  # type: ignore[arg-type]
-    graph_b = build_graph(base_spec)  # type: ignore[arg-type]
-
-    def prefer_alpha_start(node: GraphNode, graph: Graph, step: int) -> float:
-        return -float(ord(node.id[0]))
-
-    def prefer_alpha_end(node: GraphNode, graph: Graph, step: int) -> float:
-        return float(ord(node.id[0]))
-
-    run_traversal(graph_a, steps=1, score_fn=prefer_alpha_start)
-    run_traversal(graph_b, steps=1, score_fn=prefer_alpha_end)
-
-    assert normalize_graph(graph_a) != normalize_graph(graph_b)
+def make_graph_with_symbols() -> Graph:
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": "A", "kind": "symbol", "state": "pending"},
+                {"id": "B", "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [
+                {"source": "A", "target": "B", "kind": "calls"},
+            ],
+        }
+    )
+    graph.nodes["A"]["symbol"] = "expand_node"
+    graph.nodes["A"]["file"] = "src/iterative_context/expansion.py"
+    graph.nodes["B"]["symbol"] = "other_symbol"
+    graph.nodes["B"]["file"] = "src/iterative_context/other.py"
+    return graph
 
 
-def test_policy_must_return_numeric() -> None:
-    graph = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}]})  # type: ignore[arg-type]
-
-    def bad_policy(node: GraphNode, graph: Graph, step: int) -> object:
-        return "not-a-number"
-
-    with pytest.raises(ValueError):
-        run_traversal(graph, steps=1, score_fn=cast(SelectionCallable, bad_policy))
+@pytest.fixture
+def activate_graph() -> Graph:
+    graph = make_graph_with_symbols()
+    _set_active_graph(graph)
+    return graph
 
 
-def test_external_score_fn_overrides_default() -> None:
-    base_spec = {
-        "nodes": [
-            {"id": "A", "kind": "symbol", "state": "pending"},
-            {"id": "B", "kind": "symbol", "state": "pending"},
-        ],
-        "edges": [],
-    }
-    graph = build_graph(base_spec)  # type: ignore[arg-type]
-
-    def prefer_b(node: GraphNode, graph: Graph, step: int) -> float:
-        return 10.0 if node.id == "B" else 0.0
-
-    run_traversal(graph, steps=1, score_fn=prefer_b)
-
-    assert "B_child" in graph.nodes
+def test_resolve_symbol(activate_graph: Graph) -> None:
+    node = resolve("expand_node")
+    assert node is not None
+    assert node.id == "A"
 
 
-def test_default_score_fn_still_applies() -> None:
-    base_spec = {
-        "nodes": [
-            {"id": "A", "kind": "symbol", "state": "pending"},
-        ],
-        "edges": [],
-    }
-    graph_one = build_graph(base_spec)  # type: ignore[arg-type]
-    graph_two = build_graph(base_spec)  # type: ignore[arg-type]
-
-    run_traversal(graph_one, steps=1, score_fn=None)
-    run_traversal(graph_two, steps=1, score_fn=default_score_fn)
-
-    assert normalize_graph(graph_one) == normalize_graph(graph_two)
+def test_resolve_deterministic(activate_graph: Graph) -> None:
+    node1 = resolve("expand_node")
+    node2 = resolve("expand_node")
+    assert node1 is not None and node2 is not None
+    assert node1.id == node2.id
 
 
-def test_determinism_with_callable() -> None:
-    base_spec = {
-        "nodes": [
-            {"id": "A", "kind": "symbol", "state": "pending"},
-            {"id": "B", "kind": "symbol", "state": "pending"},
-        ],
-        "edges": [],
-    }
-    graph_one = build_graph(base_spec)  # type: ignore[arg-type]
-    graph_two = build_graph(base_spec)  # type: ignore[arg-type]
+def test_expand_returns_snapshot(activate_graph: Graph) -> None:
+    snapshot = expand("A", depth=2)
+    assert snapshot["nodes"]
 
-    def prefer_a(node: GraphNode, graph: Graph, step: int) -> float:
-        return 1.0 if node.id == "A" else 0.5
 
-    run_traversal(graph_one, steps=2, score_fn=prefer_a)
-    run_traversal(graph_two, steps=2, score_fn=prefer_a)
+def test_resolve_and_expand_integration(activate_graph: Graph) -> None:
+    direct_node = resolve("expand_node")
+    assert direct_node is not None
+    manual = expand(direct_node.id, depth=2)
 
-    assert normalize_graph(graph_one) == normalize_graph(graph_two)
+    combined = resolve_and_expand("expand_node", depth=2)
+
+    assert manual == combined
+
+
+def test_expand_with_callable_policy(activate_graph: Graph) -> None:
+    def score(node: GraphNode, graph: Graph, step: int) -> float:
+        return 1.0
+
+    result = expand_with_policy("A", depth=1, score_fn=score)
+
+    assert result is not None
 </file>
 
 <file path="src/iterative_context/test_helpers/graph_dsl.py">
@@ -10227,6 +10020,213 @@ __all__ = [
     "EventSpec",
     "GraphType",
 ]
+</file>
+
+<file path="src/iterative_context/traversal.py">
+# iterative-context/src/iterative_context/traversal.py
+
+from __future__ import annotations
+
+import copy
+from collections.abc import Sequence
+from typing import Protocol, cast
+
+from iterative_context.expansion import expand_node
+from iterative_context.graph_models import Graph, GraphEvent, GraphNode
+from iterative_context.scoring import default_score_fn
+from iterative_context.selection_policy import CallableSelectionPolicy
+from iterative_context.test_helpers.graph_dsl import apply_events
+from iterative_context.types import SelectionCallable
+
+
+def get_frontier(graph: Graph) -> list[GraphNode]:
+    """Return pending nodes eligible for expansion, sorted deterministically by id."""
+    frontier: list[GraphNode] = []
+    for _, data in graph.nodes(data=True):
+        node = cast(GraphNode, data["data"] if isinstance(data, dict) and "data" in data else data)
+        if getattr(node, "state", None) == "pending":
+            frontier.append(node)
+    frontier.sort(key=lambda n: n.id)
+    return frontier
+
+
+def score_node(node: GraphNode, graph: Graph, step: int) -> float:
+    """Assign a deterministic score to a node."""
+    score = 0.0
+    if node.state == "pending":
+        score += 5.0
+    if getattr(node, "state", None) == "anchor":
+        score += 10.0
+
+    degree = graph.in_degree(node.id) + graph.out_degree(node.id)
+    score += degree * 0.5
+
+    tokens = getattr(node, "tokens", None)
+    if tokens is not None:
+        score += min(tokens, 50) * 0.1
+
+    return score
+
+
+def select_next_node(
+    candidates: Sequence[GraphNode],
+    graph: Graph,
+    step: int,
+    score_fn: SelectionCallable,
+) -> GraphNode:
+    """Select the best node to expand using a scoring callable."""
+    graph.graph["last_scores"] = [
+        {"id": node.id, "score": score_fn(node, graph, step)} for node in candidates
+    ]
+    return max(candidates, key=lambda n: (score_fn(n, graph, step), n.id))
+
+
+class ExpansionPolicy(Protocol):
+    def expand(self, node: GraphNode, graph: Graph) -> Sequence[GraphEvent]:
+        ...
+
+
+class DefaultExpansionPolicy:
+    def expand(self, node: GraphNode, graph: Graph) -> Sequence[GraphEvent]:
+        return expand_node(
+            {"id": node.id, "state": node.state},
+            graph,
+        )
+
+
+def run_traversal(
+    graph: Graph,
+    steps: int,
+    expansion_policy: ExpansionPolicy | None = None,
+    score_fn: SelectionCallable | None = None,
+) -> Graph:
+    """Run N expansion steps using the provided scoring policy."""
+    policy_wrapper = CallableSelectionPolicy(score_fn or default_score_fn)
+    active_expansion_policy = expansion_policy or DefaultExpansionPolicy()
+    graph.graph.setdefault("graph_steps", [copy.deepcopy(graph)])
+    score_history = graph.graph.setdefault("score_history", [])
+    for step in range(steps):
+        candidates = get_frontier(graph)
+        if not candidates:
+            break
+        node = select_next_node(candidates, graph, step, policy_wrapper.score)
+        score_history.append(graph.graph.get("last_scores", []))
+        events = active_expansion_policy.expand(node, graph)
+        apply_events(graph, events)
+        graph.graph["graph_steps"].append(copy.deepcopy(graph))
+    return graph
+
+
+__all__ = [
+    "get_frontier",
+    "score_node",
+    "select_next_node",
+    "ExpansionPolicy",
+    "DefaultExpansionPolicy",
+    "run_traversal",
+]
+</file>
+
+<file path="tests/test_traversal_selection.py">
+# pyright: reportPrivateUsage=false
+
+from typing import cast
+
+import pytest
+
+from iterative_context.graph_models import Graph, GraphNode
+from iterative_context.scoring import default_score_fn
+from iterative_context.test_helpers import build_graph, normalize_graph
+from iterative_context.traversal import run_traversal
+from iterative_context.types import SelectionCallable
+
+
+def test_traversal_changes_with_policy() -> None:
+    base_spec = {
+        "nodes": [
+            {"id": "A", "kind": "symbol", "state": "pending"},
+            {"id": "B", "kind": "symbol", "state": "pending"},
+        ],
+        "edges": [],
+    }
+
+    graph_a = build_graph(base_spec)  # type: ignore[arg-type]
+    graph_b = build_graph(base_spec)  # type: ignore[arg-type]
+
+    def prefer_alpha_start(node: GraphNode, graph: Graph, step: int) -> float:
+        return -float(ord(node.id[0]))
+
+    def prefer_alpha_end(node: GraphNode, graph: Graph, step: int) -> float:
+        return float(ord(node.id[0]))
+
+    run_traversal(graph_a, steps=1, score_fn=prefer_alpha_start)
+    run_traversal(graph_b, steps=1, score_fn=prefer_alpha_end)
+
+    assert normalize_graph(graph_a) != normalize_graph(graph_b)
+
+
+def test_policy_must_return_numeric() -> None:
+    graph = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}]})  # type: ignore[arg-type]
+
+    def bad_policy(node: GraphNode, graph: Graph, step: int) -> object:
+        return "not-a-number"
+
+    with pytest.raises(ValueError):
+        run_traversal(graph, steps=1, score_fn=cast(SelectionCallable, bad_policy))
+
+
+def test_external_score_fn_overrides_default() -> None:
+    base_spec = {
+        "nodes": [
+            {"id": "A", "kind": "symbol", "state": "pending"},
+            {"id": "B", "kind": "symbol", "state": "pending"},
+        ],
+        "edges": [],
+    }
+    graph = build_graph(base_spec)  # type: ignore[arg-type]
+
+    def prefer_b(node: GraphNode, graph: Graph, step: int) -> float:
+        return 10.0 if node.id == "B" else 0.0
+
+    run_traversal(graph, steps=1, score_fn=prefer_b)
+
+    assert "B_child" in graph.nodes
+
+
+def test_default_score_fn_still_applies() -> None:
+    base_spec = {
+        "nodes": [
+            {"id": "A", "kind": "symbol", "state": "pending"},
+        ],
+        "edges": [],
+    }
+    graph_one = build_graph(base_spec)  # type: ignore[arg-type]
+    graph_two = build_graph(base_spec)  # type: ignore[arg-type]
+
+    run_traversal(graph_one, steps=1, score_fn=None)
+    run_traversal(graph_two, steps=1, score_fn=default_score_fn)
+
+    assert normalize_graph(graph_one) == normalize_graph(graph_two)
+
+
+def test_determinism_with_callable() -> None:
+    base_spec = {
+        "nodes": [
+            {"id": "A", "kind": "symbol", "state": "pending"},
+            {"id": "B", "kind": "symbol", "state": "pending"},
+        ],
+        "edges": [],
+    }
+    graph_one = build_graph(base_spec)  # type: ignore[arg-type]
+    graph_two = build_graph(base_spec)  # type: ignore[arg-type]
+
+    def prefer_a(node: GraphNode, graph: Graph, step: int) -> float:
+        return 1.0 if node.id == "A" else 0.5
+
+    run_traversal(graph_one, steps=2, score_fn=prefer_a)
+    run_traversal(graph_two, steps=2, score_fn=prefer_a)
+
+    assert normalize_graph(graph_one) == normalize_graph(graph_two)
 </file>
 
 <file path="pyproject.toml">
