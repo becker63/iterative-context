@@ -55,6 +55,7 @@ The content is organized as follows:
     3b512d88fc2a2d11
     3c0584d65958af1c
     3ce4b39de52f1571
+    3d5d773594958dfe
     3db258270ee98da6
     3e6b3cf575de1e2d
     3e760b36791142ee
@@ -70,6 +71,7 @@ The content is organized as follows:
     58d3fceec14484db
     58d5b4e9df76e576
     5a4d10673a16ffda
+    6ffa251530df40f3
     7023e2ba4fce5ddc
     70d0433d1346aa22
     7f3a47ec253ebf5b
@@ -91,6 +93,7 @@ The content is organized as follows:
     d481fb3784aff943
     d4882342917c3538
     d4e524a60be919bc
+    d91c10ec17eca127
     dc9f1dcaf34c53f5
     e0bdcb89eae21da2
     e15096283a36eedb
@@ -104,6 +107,7 @@ The content is organized as follows:
     f24a24344fb8325a
     f901122776c6e35d
     fbeac6778bc9b54f
+    ff3125de0f0dcef1
   examples/
     04e6b3400353b141/
       153652fceb7e5784
@@ -151,6 +155,7 @@ src/
     exploration.py
     graph_models.py
     normalize.py
+    policy.py
     raw_tree.py
     scoring_eval.py
     scoring.py
@@ -189,6 +194,7 @@ tests/
   test_ingest_llm_tldr.py
   test_llm_tldr_normalization.py
   test_resolve_expand.py
+  test_server.py
   test_traversal_selection.py
 .gitignore
 .python-version
@@ -202,6 +208,20 @@ README.md
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path=".hypothesis/constants/3d5d773594958dfe">
+# file: /home/becker/projects/iterative-context/src/iterative_context/server.py
+# hypothesis_version: 6.151.9
+
+['active_graph', 'call_tool', 'data', 'default', 'depth', 'description', 'edges', 'error', 'expand', 'full_graph', 'graph', 'id', 'injected', 'integer', 'iterative-context', 'list_tools', 'local_policy', 'metadata', 'minimum', 'node', 'node_id', 'nodes', 'object', 'properties', 'required', 'resolve', 'resolve_and_expand', 'score', 'score_fn', 'score_source', 'server', 'source', 'string', 'symbol', 'text', 'type']
+</file>
+
+<file path=".hypothesis/constants/6ffa251530df40f3">
+# file: /home/becker/projects/iterative-context/src/iterative_context/exploration.py
+# hypothesis_version: 6.151.9
+
+['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'repo_root', 'repo_signature', 'symbol', 'type']
+</file>
 
 <file path=".hypothesis/constants/059e28a3da5fbf99">
 # file: /home/becker/projects/iterative-context/src/iterative_context/__init__.py
@@ -546,6 +566,13 @@ This section contains the contents of the repository's files.
 ['*.py', '.venv', '__pycache__', 'calls', 'data', 'depth', 'edges', 'expanded_from', 'file', 'function', 'imports', 'kind', 'metadata', 'nodes', 'references', 'symbol', 'type']
 </file>
 
+<file path=".hypothesis/constants/d91c10ec17eca127">
+# file: /home/becker/projects/iterative-context/src/iterative_context/server.py
+# hypothesis_version: 6.151.9
+
+['call_tool', 'data', 'depth', 'description', 'edges', 'error', 'expand', 'graph', 'id', 'integer', 'iterative-context', 'list_tools', 'metadata', 'minimum', 'node', 'node_id', 'nodes', 'object', 'properties', 'required', 'resolve', 'resolve_and_expand', 'server', 'string', 'symbol', 'text', 'type']
+</file>
+
 <file path=".hypothesis/constants/dc9f1dcaf34c53f5">
 # file: /home/becker/projects/iterative-context/src/iterative_context/scoring_eval.py
 # hypothesis_version: 6.151.9
@@ -635,6 +662,13 @@ This section contains the contents of the repository's files.
 # hypothesis_version: 6.151.9
 
 ['*.py', '.venv', '__pycache__', 'call', 'call_graph', 'called_functions', 'calls', 'functions', 'import', 'imports', 'module', 'name', 'python']
+</file>
+
+<file path=".hypothesis/constants/ff3125de0f0dcef1">
+# file: /home/becker/projects/iterative-context/src/iterative_context/server.py
+# hypothesis_version: 6.151.9
+
+['active_graph', 'call_tool', 'data', 'default', 'depth', 'description', 'edges', 'error', 'expand', 'full_graph', 'graph', 'id', 'injected', 'integer', 'iterative-context', 'list_tools', 'local_policy', 'metadata', 'minimum', 'node', 'node_id', 'nodes', 'object', 'properties', 'required', 'resolve', 'resolve_and_expand', 'score', 'score_fn', 'score_source', 'server', 'source', 'string', 'symbol', 'text', 'type']
 </file>
 
 <file path="notes/llm-tldr/todo_phases.md">
@@ -5103,6 +5137,24 @@ def iter_repos() -> Iterator[tuple[str, Path]]:
         yield name, get_repo(name)
 </file>
 
+<file path="src/iterative_context/policy.py">
+"""Local scoring policy fallback."""
+
+from __future__ import annotations
+
+from iterative_context.graph_models import Graph, GraphNode
+from iterative_context.scoring import score_degree
+
+
+def score_fn(node: GraphNode, graph: Graph, step: int) -> float:
+    """Deterministic local policy used when no injected scorer is provided."""
+    # Degree-only scoring keeps behavior predictable while differing from the default.
+    return score_degree(node, graph, step)
+
+
+__all__ = ["score_fn"]
+</file>
+
 <file path="src/iterative_context/raw_tree.py">
 from pydantic import BaseModel
 
@@ -5261,71 +5313,6 @@ def serialize_graph(graph: Graph, metadata: dict[str, Any] | None = None) -> dic
 
 
 __all__ = ["serialize_node", "serialize_graph"]
-</file>
-
-<file path="src/iterative_context/server.py">
-# pyright: reportUnusedFunction=false
-
-from __future__ import annotations
-
-from typing import Any
-
-from mcp.server.fastmcp import FastMCP
-
-from iterative_context import exploration
-from iterative_context.serialization import serialize_node
-from iterative_context.types import SelectionCallable
-
-
-def _resolve_symbol(symbol: str) -> dict[str, Any] | None:
-    node = exploration.resolve(symbol)
-    if node is None:
-        return None
-
-    graph = exploration.get_active_graph()
-    extras: dict[str, Any] = {}
-    if graph is not None and node.id in graph.nodes:
-        raw = graph.nodes[node.id]
-        extras = {k: v for k, v in raw.items() if k != "data"}
-
-    return serialize_node(node, extras)
-
-
-def create_mcp_server(score_fn: SelectionCallable | None = None) -> FastMCP:
-    mcp = FastMCP("iterative-context", json_response=True)
-
-    @mcp.tool()  # type: ignore[misc]
-    def resolve(symbol: str) -> dict[str, Any]:
-        exploration.ensure_graph_loaded()
-        node = _resolve_symbol(symbol)
-        return {"node": node}
-
-    @mcp.tool()  # type: ignore[misc]
-    def expand(node_id: str, depth: int) -> dict[str, Any]:
-        exploration.ensure_graph_loaded()
-        graph = exploration.expand(node_id=node_id, depth=depth, score_fn=score_fn)
-        return {"graph": graph}
-
-    @mcp.tool()  # type: ignore[misc]
-    def resolve_and_expand(symbol: str, depth: int) -> dict[str, Any]:
-        exploration.ensure_graph_loaded()
-
-        node = _resolve_symbol(symbol)
-        if node is None:
-            return {"graph": {"nodes": [], "edges": [], "metadata": {}}}
-
-        return {"graph": exploration.expand(node["id"], depth=depth, score_fn=score_fn)}
-
-    return mcp
-
-
-def run_server(score_fn: SelectionCallable | None = None) -> None:
-    mcp = create_mcp_server(score_fn)
-    mcp.run(transport="stdio")
-
-
-if __name__ == "__main__":
-    run_server()
 </file>
 
 <file path="src/iterative_context/types.py">
@@ -6524,6 +6511,295 @@ def test_repo_has_pyproject(repo: tuple[str, Path]) -> None:
     assert pyproject.exists(), (
         f"{name} repo missing pyproject.toml — not a valid test target: {path}"
     )
+</file>
+
+<file path="tests/test_server.py">
+"""MCP surface integration tests."""
+# pyright: reportPrivateUsage=false
+from __future__ import annotations
+
+import json
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+
+from iterative_context import exploration, server
+from iterative_context.exploration import _repo_signature, _set_active_graph
+from iterative_context.graph_models import Graph, GraphNode
+from iterative_context.server import IterativeContextToolRuntime, call_tool, list_tools
+from iterative_context.test_helpers.graph_dsl import build_graph
+
+
+@pytest.fixture(autouse=True)
+def _reset_active_graph() -> Iterator[None]:  # pyright: ignore[reportUnusedFunction]
+    exploration._clear_active_graph()
+    yield
+    exploration._clear_active_graph()
+
+
+def _make_graph_with_symbols() -> Graph:
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": "A", "kind": "symbol", "state": "pending"},
+                {"id": "B", "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [
+                {"source": "A", "target": "B", "kind": "calls"},
+            ],
+        }
+    )
+    graph.nodes["A"]["symbol"] = "expand_node"
+    graph.nodes["A"]["file"] = "src/iterative_context/expansion.py"
+    graph.nodes["B"]["symbol"] = "other_symbol"
+    graph.nodes["B"]["file"] = "src/iterative_context/other.py"
+    return graph
+
+
+def _activate_graph_with_symbols() -> None:
+    graph = _make_graph_with_symbols()
+    signature = _repo_signature(Path.cwd())
+    _set_active_graph(graph, repo_root=Path.cwd().resolve(), signature=signature)
+
+
+@pytest.mark.anyio
+async def test_list_tools_definitions() -> None:
+    tools = await list_tools()
+    names = {tool.name for tool in tools}
+    assert names == {"resolve", "expand", "resolve_and_expand"}
+
+    resolve_tool = next(tool for tool in tools if tool.name == "resolve")
+    assert resolve_tool.inputSchema["required"] == ["symbol"]
+    assert resolve_tool.inputSchema["properties"]["symbol"]["type"] == "string"
+
+    expand_tool = next(tool for tool in tools if tool.name == "expand")
+    assert expand_tool.inputSchema["properties"]["depth"]["type"] == "integer"
+    assert "node_id" in expand_tool.inputSchema["required"]
+
+
+@pytest.mark.anyio
+async def test_call_tool_resolve_serializes_node() -> None:
+    _activate_graph_with_symbols()
+
+    response = await call_tool("resolve", {"symbol": "expand_node"})
+    payload = json.loads(response[0].text)
+
+    assert payload["node"]["id"] == "A"
+    assert payload["node"]["symbol"] == "expand_node"
+    assert "file" in payload["node"]
+    assert payload["full_graph"]["nodes"]
+    assert payload["score_source"] == "local_policy"
+
+
+@pytest.mark.anyio
+async def test_call_tool_expand_returns_graph() -> None:
+    _activate_graph_with_symbols()
+
+    response = await call_tool("expand", {"node_id": "A", "depth": 1})
+    payload = json.loads(response[0].text)
+    graph = payload["graph"]
+
+    assert graph["metadata"]["expanded_from"] == "A"
+    assert graph["metadata"]["depth"] == 1
+    assert graph["nodes"]
+    assert payload["full_graph"]["nodes"]
+    assert payload["score_source"] == "local_policy"
+
+
+@pytest.mark.anyio
+async def test_call_tool_resolve_and_expand() -> None:
+    _activate_graph_with_symbols()
+
+    response = await call_tool("resolve_and_expand", {"symbol": "expand_node", "depth": 1})
+    payload = json.loads(response[0].text)
+
+    assert payload["graph"]["metadata"]["expanded_from"] == "A"
+    assert payload["graph"]["nodes"]
+    assert payload["full_graph"]["nodes"]
+    assert payload["score_source"] == "local_policy"
+
+
+@pytest.mark.anyio
+async def test_call_tool_unknown_returns_error() -> None:
+    _activate_graph_with_symbols()
+
+    response = await call_tool("unknown_tool", {})
+    payload = json.loads(response[0].text)
+
+    assert "error" in payload
+    assert "unknown" in payload["error"].lower()
+    assert payload["score_source"] == "local_policy"
+
+
+@pytest.mark.anyio
+async def test_runtime_uses_injected_score_fn(monkeypatch: pytest.MonkeyPatch) -> None:
+    _activate_graph_with_symbols()
+    score_calls: list[str] = []
+
+    def score_fn(node: GraphNode, graph: Graph, step: int) -> float:
+        score_calls.append(node.id)
+        return 1.0
+
+    # If the injected scorer is used, the local policy should never be consulted.
+    def fail_local_policy() -> None:  # pragma: no cover - defensive guard
+        raise AssertionError("local policy should not be loaded when score_fn is injected")
+
+    monkeypatch.setattr(server, "load_local_policy", fail_local_policy)
+
+    runtime = IterativeContextToolRuntime(score_fn=score_fn)
+    response = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
+    payload = json.loads(response[0].text)
+
+    assert score_calls
+    assert payload["graph"]["metadata"]["expanded_from"] == "A"
+    assert payload["score_source"] == "injected"
+
+
+@pytest.mark.anyio
+async def test_runtime_uses_local_policy_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    _activate_graph_with_symbols()
+    score_calls: list[str] = []
+
+    def local_score(node: GraphNode, graph: Graph, step: int) -> float:
+        score_calls.append(node.id)
+        return 2.0
+
+    monkeypatch.setattr(server, "load_local_policy", lambda: local_score)
+
+    runtime = IterativeContextToolRuntime()
+    response = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
+    payload = json.loads(response[0].text)
+
+    assert score_calls
+    assert payload["score_source"] == "local_policy"
+
+
+@pytest.mark.anyio
+async def test_runtime_falls_back_to_default_when_policy_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _activate_graph_with_symbols()
+    score_calls: list[str] = []
+
+    def default_score(node: GraphNode, graph: Graph, step: int) -> float:
+        score_calls.append(node.id)
+        return 3.0
+
+    monkeypatch.setattr(server, "load_local_policy", lambda: None)
+    monkeypatch.setattr(server, "default_score_fn", default_score)
+
+    runtime = IterativeContextToolRuntime()
+    response = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
+    payload = json.loads(response[0].text)
+
+    assert score_calls
+    assert payload["score_source"] == "default"
+
+
+def _write_repo(root: Path, symbol: str) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "module.py").write_text(
+        f"def {symbol}() -> str:\n    return '{symbol}'\n", encoding="utf-8"
+    )
+    return root
+
+
+@pytest.fixture
+def two_repos(tmp_path: Path) -> tuple[Path, Path]:
+    repo_a = _write_repo(tmp_path / "repo_a", "alpha_symbol")
+    repo_b = _write_repo(tmp_path / "repo_b", "beta_symbol")
+    return repo_a, repo_b
+
+
+def test_explicit_repo_load_without_chdir(two_repos: tuple[Path, Path]) -> None:
+    repo_a, _ = two_repos
+    start_cwd = Path.cwd()
+
+    exploration.ensure_graph_loaded(repo_root=repo_a)
+    node = exploration.resolve("alpha_symbol")
+
+    assert node is not None
+    assert exploration.resolve("beta_symbol") is None
+    assert Path.cwd() == start_cwd
+    assert str(node.id).endswith("alpha_symbol")
+
+
+@pytest.mark.anyio
+async def test_runtime_binds_to_repo_root(two_repos: tuple[Path, Path]) -> None:
+    repo_a, _ = two_repos
+    runtime = IterativeContextToolRuntime(repo_root=repo_a)
+
+    response = await runtime.call_tool("resolve", {"symbol": "alpha_symbol"})
+    payload = json.loads(response[0].text)
+
+    assert payload["node"]["symbol"] == "alpha_symbol"
+
+    missing = await runtime.call_tool("resolve", {"symbol": "beta_symbol"})
+    missing_payload = json.loads(missing[0].text)
+    assert missing_payload["node"] is None
+
+
+@pytest.mark.anyio
+async def test_runtimes_isolate_repos(two_repos: tuple[Path, Path]) -> None:
+    repo_a, repo_b = two_repos
+    runtime_a = IterativeContextToolRuntime(repo_root=repo_a)
+    runtime_b = IterativeContextToolRuntime(repo_root=repo_b)
+
+    first = await runtime_a.call_tool("resolve", {"symbol": "alpha_symbol"})
+    first_payload = json.loads(first[0].text)
+    second = await runtime_b.call_tool("resolve", {"symbol": "beta_symbol"})
+    second_payload = json.loads(second[0].text)
+
+    expand_a = await runtime_a.call_tool(
+        "expand", {"node_id": first_payload["node"]["id"], "depth": 0}
+    )
+    expand_b = await runtime_b.call_tool(
+        "expand", {"node_id": second_payload["node"]["id"], "depth": 0}
+    )
+
+    graph_a = json.loads(expand_a[0].text)["graph"]
+    graph_b = json.loads(expand_b[0].text)["graph"]
+
+    symbols_a = {n["symbol"] for n in graph_a["nodes"]}
+    symbols_b = {n["symbol"] for n in graph_b["nodes"]}
+
+    assert symbols_a == {"alpha_symbol"}
+    assert symbols_b == {"beta_symbol"}
+
+
+@pytest.mark.anyio
+async def test_runtime_defaults_to_cwd(
+    two_repos: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_a, _ = two_repos
+    monkeypatch.chdir(repo_a)
+
+    runtime = IterativeContextToolRuntime()
+    response = await runtime.call_tool("resolve", {"symbol": "alpha_symbol"})
+    payload = json.loads(response[0].text)
+
+    assert payload["node"]["symbol"] == "alpha_symbol"
+
+
+def test_ensure_graph_loaded_idempotent(
+    two_repos: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_a, _ = two_repos
+    calls: list[Path] = []
+
+    original = exploration._build_graph_from_repo
+
+    def _tracked(root: Path) -> Graph:
+        calls.append(root)
+        return original(root)
+
+    monkeypatch.setattr(exploration, "_build_graph_from_repo", _tracked)
+
+    exploration.ensure_graph_loaded(repo_root=repo_a)
+    exploration.ensure_graph_loaded(repo_root=repo_a)
+
+    assert calls == [Path(repo_a).resolve()]
 </file>
 
 <file path=".gitignore">
@@ -7872,6 +8148,244 @@ def default_score_fn(node: GraphNode, graph: Graph, step: int) -> float:
 __all__ = ["score_v1", "score_degree", "score_random", "default_score_fn"]
 </file>
 
+<file path="src/iterative_context/server.py">
+from __future__ import annotations
+
+import importlib
+import json
+from pathlib import Path
+from typing import Any, cast
+
+from mcp.server import Server
+from mcp.types import TextContent, Tool
+
+from iterative_context import exploration
+from iterative_context.scoring import default_score_fn
+from iterative_context.serialization import serialize_graph, serialize_node
+from iterative_context.types import SelectionCallable
+
+server = Server("iterative-context")
+
+
+def _resolve_symbol(symbol: str) -> dict[str, Any] | None:
+    """Look up a symbol and serialize it with any graph extras."""
+    node = exploration.resolve(symbol)
+    if node is None:
+        return None
+
+    graph = exploration.get_active_graph()
+    extras: dict[str, Any] = {}
+    if graph is not None and node.id in graph.nodes:
+        raw = graph.nodes[node.id]
+        extras = {k: v for k, v in raw.items() if k != "data"}
+
+    return serialize_node(node, extras)
+
+
+def _serialize_active_graph() -> dict[str, Any]:
+    graph = exploration.get_active_graph()
+    metadata: dict[str, Any] = {"source": "active_graph"}
+    metadata.update(exploration.get_active_repo_metadata())
+    if graph is None:
+        return {"nodes": [], "edges": [], "metadata": metadata}
+    return serialize_graph(graph, metadata=metadata)
+
+
+def _tool_definitions() -> list[Tool]:
+    return [
+        Tool(
+            name="resolve",
+            description="Resolve a symbol to a graph node if present.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Symbol identifier to resolve"}
+                },
+                "required": ["symbol"],
+            },
+        ),
+        Tool(
+            name="expand",
+            description="Expand a node outward to a bounded depth.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "node_id": {"type": "string", "description": "ID of the node to expand"},
+                    "depth": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Expansion depth to explore",
+                    },
+                },
+                "required": ["node_id", "depth"],
+            },
+        ),
+        Tool(
+            name="resolve_and_expand",
+            description="Resolve a symbol and expand its neighborhood.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Symbol identifier to resolve"},
+                    "depth": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Expansion depth to explore",
+                    },
+                },
+                "required": ["symbol", "depth"],
+            },
+        ),
+    ]
+
+
+def _as_text_content(payload: dict[str, Any]) -> TextContent:
+    return TextContent(type="text", text=json.dumps(payload))
+
+
+class IterativeContextToolRuntime:
+    """In-process MCP-compatible runtime with optional scoring injection."""
+
+    def __init__(
+        self,
+        score_fn: SelectionCallable | None = None,
+        repo_root: str | Path | None = None,
+    ):
+        self._score_fn = score_fn
+        self._repo_root = Path(repo_root).resolve() if repo_root is not None else None
+
+    async def list_tools(self) -> list[Tool]:
+        return _tool_definitions()
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> list[TextContent]:
+        try:
+            result = self._dispatch(name, arguments or {})
+            return [_as_text_content(result)]
+        except Exception as exc:  # pragma: no cover - defensive guard
+            return [_as_text_content({"error": str(exc)})]
+
+    def _dispatch(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        score_fn, score_source = _resolve_effective_score_fn(self._score_fn)
+        tool_name = name.strip()
+        if tool_name == "resolve":
+            symbol = _require_str(arguments, "symbol")
+            self._ensure_graph_ready()
+            return {
+                "node": _resolve_symbol(symbol),
+                "full_graph": _serialize_active_graph(),
+                "score_source": score_source,
+            }
+
+        if tool_name == "expand":
+            node_id = _require_str(arguments, "node_id")
+            depth = _require_int(arguments, "depth")
+            self._ensure_graph_ready()
+            graph = exploration.expand(node_id=node_id, depth=depth, score_fn=score_fn)
+            return {
+                "graph": graph,
+                "full_graph": _serialize_active_graph(),
+                "score_source": score_source,
+            }
+
+        if tool_name == "resolve_and_expand":
+            symbol = _require_str(arguments, "symbol")
+            depth = _require_int(arguments, "depth")
+            self._ensure_graph_ready()
+
+            node = _resolve_symbol(symbol)
+            if node is None:
+                return {
+                    "node": None,
+                    "graph": {"nodes": [], "edges": [], "metadata": {}},
+                    "full_graph": _serialize_active_graph(),
+                    "score_source": score_source,
+                }
+
+            return {
+                "node": node,
+                "graph": exploration.expand(node["id"], depth=depth, score_fn=score_fn),
+                "full_graph": _serialize_active_graph(),
+                "score_source": score_source,
+            }
+
+        return {"error": f"Unknown tool: {name}", "score_source": score_source}
+
+    def _ensure_graph_ready(self) -> None:
+        exploration.ensure_graph_loaded(repo_root=self._repo_root)
+
+
+def _require_str(arguments: dict[str, Any], key: str) -> str:
+    value = arguments.get(key)
+    if not isinstance(value, str):
+        raise ValueError(f"{key} must be a string")
+    return value
+
+
+def _require_int(arguments: dict[str, Any], key: str) -> int:
+    value = arguments.get(key)
+    if not isinstance(value, int):
+        raise ValueError(f"{key} must be an integer")
+    return value
+
+
+def load_local_policy() -> SelectionCallable | None:
+    """Dynamically load a local policy module if present."""
+    try:
+        policy_module = importlib.import_module("iterative_context.policy")
+    except Exception:
+        return None
+
+    candidate = getattr(policy_module, "score_fn", None) or getattr(policy_module, "score", None)
+    if callable(candidate):
+        return cast(SelectionCallable, candidate)
+    return None
+
+
+def _resolve_effective_score_fn(
+    injected_score_fn: SelectionCallable | None,
+) -> tuple[SelectionCallable, str]:
+    """Resolve the scoring function with explicit precedence."""
+    if injected_score_fn is not None:
+        return injected_score_fn, "injected"
+
+    local_policy = load_local_policy()
+    if local_policy is not None:
+        return local_policy, "local_policy"
+
+    return default_score_fn, "default"
+
+
+_default_runtime = IterativeContextToolRuntime()
+
+
+async def list_tools() -> list[Tool]:
+    return await _default_runtime.list_tools()
+
+
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+    return await _default_runtime.call_tool(name, arguments)
+
+
+@server.list_tools()
+async def _server_list_tools() -> list[Tool]:  # pyright: ignore[reportUnusedFunction]
+    return await list_tools()
+
+
+@server.call_tool()
+async def _server_call_tool(  # pyright: ignore[reportUnusedFunction]
+    name: str, arguments: dict[str, Any]
+) -> list[TextContent]:
+    return await call_tool(name, arguments)
+
+
+__all__ = [
+    "server",
+    "IterativeContextToolRuntime",
+    "list_tools",
+    "call_tool",
+]
+</file>
+
 <file path="tests/test_expand_invariants.py">
 """Invariant tests for expand() output."""
 
@@ -8902,12 +9416,31 @@ class GraphSnapshotDict(TypedDict):
 _active_graph: Graph | None = None
 _active_store: GraphStore | None = None
 _graph_signature: str | None = None
+_active_repo_root: Path | None = None
 
 
-def _set_active_graph(graph: Graph) -> None:  # noqa: PLW0603
-    global _active_graph, _active_store  # noqa: PLW0603
+def _set_active_graph(  # noqa: PLW0603
+    graph: Graph, repo_root: Path | None = None, signature: str | None = None
+) -> None:
+    """
+    Replace the active graph and its store.
+
+    Optional repo metadata keeps the graph binding explicit when available.
+    """
+    global _active_graph, _active_store, _graph_signature, _active_repo_root  # noqa: PLW0603
     _active_graph = graph
     _active_store = GraphStore(graph)
+    _active_repo_root = repo_root
+    _graph_signature = signature
+
+
+def _clear_active_graph() -> None:  # noqa: PLW0603
+    """Reset the active graph and associated metadata."""
+    global _active_graph, _active_store, _graph_signature, _active_repo_root  # noqa: PLW0603
+    _active_graph = None
+    _active_store = None
+    _graph_signature = None
+    _active_repo_root = None
 
 
 def get_active_graph() -> Graph | None:
@@ -8992,18 +9525,43 @@ def _build_graph_from_repo(root: Path) -> Graph:
     return graph
 
 
-def ensure_graph_loaded() -> None:
-    """Idempotently load the active graph from the current repository."""
-    global _graph_signature  # noqa: PLW0603
-    root = Path.cwd()
+def _normalize_repo_root(repo_root: str | Path | None) -> Path:
+    if repo_root is None:
+        return Path.cwd().resolve()
+    return Path(repo_root).resolve()
+
+
+def ensure_graph_loaded(repo_root: str | Path | None = None) -> None:
+    """
+    Idempotently load the active graph from a repository.
+
+    If repo_root is omitted, falls back to the current working directory.
+    """
+    root = _normalize_repo_root(repo_root)
     signature = _repo_signature(root)
 
-    if _active_graph is not None and signature == _graph_signature:
+    if (
+        _active_graph is not None
+        and _active_repo_root is not None
+        and _active_repo_root == root
+        and signature == _graph_signature
+    ):
         return
 
     graph = _build_graph_from_repo(root)
-    _graph_signature = signature
-    _set_active_graph(graph)
+    graph.graph["repo_root"] = str(root)
+    graph.graph["repo_signature"] = signature
+    _set_active_graph(graph, repo_root=root, signature=signature)
+
+
+def get_active_repo_root() -> Path | None:
+    return _active_repo_root
+
+
+def get_active_repo_metadata() -> dict[str, object]:
+    if _active_repo_root is None or _graph_signature is None:
+        return {}
+    return {"repo_root": str(_active_repo_root), "repo_signature": _graph_signature}
 
 
 def resolve(symbol: str) -> GraphNode | None:

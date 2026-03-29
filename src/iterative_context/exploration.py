@@ -25,12 +25,31 @@ class GraphSnapshotDict(TypedDict):
 _active_graph: Graph | None = None
 _active_store: GraphStore | None = None
 _graph_signature: str | None = None
+_active_repo_root: Path | None = None
 
 
-def _set_active_graph(graph: Graph) -> None:  # noqa: PLW0603
-    global _active_graph, _active_store  # noqa: PLW0603
+def _set_active_graph(  # noqa: PLW0603
+    graph: Graph, repo_root: Path | None = None, signature: str | None = None
+) -> None:
+    """
+    Replace the active graph and its store.
+
+    Optional repo metadata keeps the graph binding explicit when available.
+    """
+    global _active_graph, _active_store, _graph_signature, _active_repo_root  # noqa: PLW0603
     _active_graph = graph
     _active_store = GraphStore(graph)
+    _active_repo_root = repo_root
+    _graph_signature = signature
+
+
+def _clear_active_graph() -> None:  # noqa: PLW0603
+    """Reset the active graph and associated metadata."""
+    global _active_graph, _active_store, _graph_signature, _active_repo_root  # noqa: PLW0603
+    _active_graph = None
+    _active_store = None
+    _graph_signature = None
+    _active_repo_root = None
 
 
 def get_active_graph() -> Graph | None:
@@ -115,18 +134,43 @@ def _build_graph_from_repo(root: Path) -> Graph:
     return graph
 
 
-def ensure_graph_loaded() -> None:
-    """Idempotently load the active graph from the current repository."""
-    global _graph_signature  # noqa: PLW0603
-    root = Path.cwd()
+def _normalize_repo_root(repo_root: str | Path | None) -> Path:
+    if repo_root is None:
+        return Path.cwd().resolve()
+    return Path(repo_root).resolve()
+
+
+def ensure_graph_loaded(repo_root: str | Path | None = None) -> None:
+    """
+    Idempotently load the active graph from a repository.
+
+    If repo_root is omitted, falls back to the current working directory.
+    """
+    root = _normalize_repo_root(repo_root)
     signature = _repo_signature(root)
 
-    if _active_graph is not None and signature == _graph_signature:
+    if (
+        _active_graph is not None
+        and _active_repo_root is not None
+        and _active_repo_root == root
+        and signature == _graph_signature
+    ):
         return
 
     graph = _build_graph_from_repo(root)
-    _graph_signature = signature
-    _set_active_graph(graph)
+    graph.graph["repo_root"] = str(root)
+    graph.graph["repo_signature"] = signature
+    _set_active_graph(graph, repo_root=root, signature=signature)
+
+
+def get_active_repo_root() -> Path | None:
+    return _active_repo_root
+
+
+def get_active_repo_metadata() -> dict[str, object]:
+    if _active_repo_root is None or _graph_signature is None:
+        return {}
+    return {"repo_root": str(_active_repo_root), "repo_signature": _graph_signature}
 
 
 def resolve(symbol: str) -> GraphNode | None:

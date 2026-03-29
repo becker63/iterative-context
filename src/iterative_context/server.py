@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+from pathlib import Path
 from typing import Any, cast
 
 from mcp.server import Server
@@ -32,9 +33,11 @@ def _resolve_symbol(symbol: str) -> dict[str, Any] | None:
 
 def _serialize_active_graph() -> dict[str, Any]:
     graph = exploration.get_active_graph()
+    metadata: dict[str, Any] = {"source": "active_graph"}
+    metadata.update(exploration.get_active_repo_metadata())
     if graph is None:
-        return {"nodes": [], "edges": [], "metadata": {}}
-    return serialize_graph(graph, metadata={"source": "active_graph"})
+        return {"nodes": [], "edges": [], "metadata": metadata}
+    return serialize_graph(graph, metadata=metadata)
 
 
 def _tool_definitions() -> list[Tool]:
@@ -92,8 +95,13 @@ def _as_text_content(payload: dict[str, Any]) -> TextContent:
 class IterativeContextToolRuntime:
     """In-process MCP-compatible runtime with optional scoring injection."""
 
-    def __init__(self, score_fn: SelectionCallable | None = None):
+    def __init__(
+        self,
+        score_fn: SelectionCallable | None = None,
+        repo_root: str | Path | None = None,
+    ):
         self._score_fn = score_fn
+        self._repo_root = Path(repo_root).resolve() if repo_root is not None else None
 
     async def list_tools(self) -> list[Tool]:
         return _tool_definitions()
@@ -152,8 +160,7 @@ class IterativeContextToolRuntime:
         return {"error": f"Unknown tool: {name}", "score_source": score_source}
 
     def _ensure_graph_ready(self) -> None:
-        if exploration.get_active_graph() is None:
-            exploration.ensure_graph_loaded()
+        exploration.ensure_graph_loaded(repo_root=self._repo_root)
 
 
 def _require_str(arguments: dict[str, Any], key: str) -> str:
