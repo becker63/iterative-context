@@ -10229,6 +10229,21 @@ def test_determinism_with_callable() -> None:
     assert normalize_graph(graph_one) == normalize_graph(graph_two)
 </file>
 
+<file path="src/iterative_context/__init__.py">
+"""Iterative Context public API."""
+
+from .exploration import expand, expand_with_policy, resolve, resolve_and_expand  # noqa: F401
+from .selection_policy import wrap_selection_callable  # noqa: F401
+
+__all__ = [
+    "resolve",
+    "expand",
+    "resolve_and_expand",
+    "expand_with_policy",
+    "wrap_selection_callable",
+]
+</file>
+
 <file path="pyproject.toml">
 [project]
 name = "iterative-context"
@@ -10249,7 +10264,13 @@ dependencies = [
     "llm-tldr>=1.5.2",
     "mcp>=1.26.0",
 ]
-packages = [{ include = "iterative_context", from = "src" }]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/iterative_context"]
 
 [tool.ruff]
 line-length = 100
@@ -10278,21 +10299,6 @@ pythonpath = ["src"]
 [dependency-groups]
 dev = [
     "iterative-context",
-]
-</file>
-
-<file path="src/iterative_context/__init__.py">
-"""Iterative Context public API."""
-
-from .exploration import expand, expand_with_policy, resolve, resolve_and_expand  # noqa: F401
-from .selection_policy import wrap_selection_callable  # noqa: F401
-
-__all__ = [
-    "resolve",
-    "expand",
-    "resolve_and_expand",
-    "expand_with_policy",
-    "wrap_selection_callable",
 ]
 </file>
 
