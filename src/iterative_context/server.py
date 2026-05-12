@@ -253,6 +253,16 @@ class IterativeContextToolRuntime:
             payload["policy_path"] = str(self._active_score_path)
         return payload
 
+    def admin_install_score(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Synchronous admin helper for harness-side validation (non-global runtime)."""
+
+        return self._install_score(arguments)
+
+    def admin_verify_score(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Synchronous admin helper for harness-side validation (non-global runtime)."""
+
+        return self._verify_score(arguments)
+
     def _resolve_effective_score_fn(self) -> tuple[SelectionCallable, str, str | None]:
         if self._installed_score_fn is not None:
             return self._installed_score_fn, "installed", self._active_score_id
@@ -372,13 +382,13 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 async def install_score(
     policy_path: str, policy_id: str, symbol: str = "score_fn"
 ) -> dict[str, Any]:
-    return _default_runtime._install_score(
+    return _default_runtime.admin_install_score(
         {"policy_path": policy_path, "policy_id": policy_id, "symbol": symbol}
     )
 
 
 async def verify_score(policy_id: str) -> dict[str, Any]:
-    return _default_runtime._verify_score({"policy_id": policy_id})
+    return _default_runtime.admin_verify_score({"policy_id": policy_id})
 
 
 @server.list_tools()
