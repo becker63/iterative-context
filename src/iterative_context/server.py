@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import json
 from pathlib import Path
 from typing import Any, cast
@@ -88,6 +89,50 @@ def _tool_definitions() -> list[Tool]:
     ]
 
 
+def _admin_tool_definitions() -> list[Tool]:
+    return [
+        Tool(
+            name="install_score",
+            description="Install a score or selection policy for this runtime session.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "policy_path": {
+                        "type": "string",
+                        "description": "Filesystem path to the Python policy module.",
+                    },
+                    "policy_id": {
+                        "type": "string",
+                        "description": "Deterministic policy identity chosen by the harness.",
+                    },
+                    "symbol": {
+                        "type": "string",
+                        "description": (
+                            "Callable symbol to load from the module. "
+                            "Defaults to score_fn."
+                        ),
+                    },
+                },
+                "required": ["policy_path", "policy_id"],
+            },
+        ),
+        Tool(
+            name="verify_score",
+            description="Verify the active session-bound score or selection policy identity.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "policy_id": {
+                        "type": "string",
+                        "description": "Expected deterministic policy identity.",
+                    }
+                },
+                "required": ["policy_id"],
+            },
+        ),
+    ]
+
+
 def _as_text_content(payload: dict[str, Any]) -> TextContent:
     return TextContent(type="text", text=json.dumps(payload))
 
@@ -99,12 +144,20 @@ class IterativeContextToolRuntime:
         self,
         score_fn: SelectionCallable | None = None,
         repo_root: str | Path | None = None,
+        require_score_install: bool = False,
     ):
         self._score_fn = score_fn
         self._repo_root = Path(repo_root).resolve() if repo_root is not None else None
+        self._require_score_install = require_score_install
+        self._installed_score_fn: SelectionCallable | None = None
+        self._active_score_id: str | None = None
+        self._active_score_path: Path | None = None
 
     async def list_tools(self) -> list[Tool]:
         return _tool_definitions()
+
+    async def list_admin_tools(self) -> list[Tool]:
+        return _admin_tool_definitions()
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> list[TextContent]:
         try:
@@ -114,8 +167,13 @@ class IterativeContextToolRuntime:
             return [_as_text_content({"error": str(exc)})]
 
     def _dispatch(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        score_fn, score_source = _resolve_effective_score_fn(self._score_fn)
         tool_name = name.strip()
+        if tool_name == "install_score":
+            return self._install_score(arguments)
+        if tool_name == "verify_score":
+            return self._verify_score(arguments)
+
+        score_fn, score_source, active_score_id = self._resolve_effective_score_fn()
         if tool_name == "resolve":
             symbol = _require_str(arguments, "symbol")
             self._ensure_graph_ready()
@@ -123,6 +181,7 @@ class IterativeContextToolRuntime:
                 "node": _resolve_symbol(symbol),
                 "full_graph": _serialize_active_graph(),
                 "score_source": score_source,
+                "active_score_id": active_score_id,
             }
 
         if tool_name == "expand":
@@ -134,33 +193,103 @@ class IterativeContextToolRuntime:
                 "graph": graph,
                 "full_graph": _serialize_active_graph(),
                 "score_source": score_source,
+                "active_score_id": active_score_id,
             }
 
         if tool_name == "resolve_and_expand":
-            symbol = _require_str(arguments, "symbol")
-            depth = _require_int(arguments, "depth")
-            self._ensure_graph_ready()
-
-            node = _resolve_symbol(symbol)
-            if node is None:
-                return {
-                    "node": None,
-                    "graph": {"nodes": [], "edges": [], "metadata": {}},
-                    "full_graph": _serialize_active_graph(),
-                    "score_source": score_source,
-                }
-
-            return {
-                "node": node,
-                "graph": exploration.expand(node["id"], depth=depth, score_fn=score_fn),
-                "full_graph": _serialize_active_graph(),
-                "score_source": score_source,
-            }
+            return self._resolve_and_expand(arguments, score_fn, score_source, active_score_id)
 
         return {"error": f"Unknown tool: {name}", "score_source": score_source}
 
     def _ensure_graph_ready(self) -> None:
         exploration.ensure_graph_loaded(repo_root=self._repo_root)
+
+    def clear_score_install(self) -> None:
+        self._installed_score_fn = None
+        self._active_score_id = None
+        self._active_score_path = None
+
+    def _install_score(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        policy_path = Path(_require_str(arguments, "policy_path")).expanduser().resolve()
+        policy_id = _require_str(arguments, "policy_id").strip()
+        if not policy_id:
+            raise ValueError("policy_id must be a non-empty string")
+
+        raw_symbol = arguments.get("symbol", "score_fn")
+        if not isinstance(raw_symbol, str) or not raw_symbol.strip():
+            raise ValueError("symbol must be a non-empty string")
+        symbol = raw_symbol.strip()
+
+        score_fn = load_policy_callable(policy_path, symbol)
+        self._installed_score_fn = score_fn
+        self._active_score_id = policy_id
+        self._active_score_path = policy_path
+        return {
+            "ok": True,
+            "policy_id": policy_id,
+            "policy_path": str(policy_path),
+            "symbol": symbol,
+            "score_source": "installed",
+        }
+
+    def _verify_score(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        expected_policy_id = _require_str(arguments, "policy_id").strip()
+        if not expected_policy_id:
+            raise ValueError("policy_id must be a non-empty string")
+
+        if self._active_score_id is None:
+            raise RuntimeError("no score installed for this runtime session")
+        if self._active_score_id != expected_policy_id:
+            raise RuntimeError(
+                f"active score mismatch: expected {expected_policy_id}, got {self._active_score_id}"
+            )
+
+        payload: dict[str, Any] = {
+            "ok": True,
+            "policy_id": self._active_score_id,
+            "score_source": "installed",
+        }
+        if self._active_score_path is not None:
+            payload["policy_path"] = str(self._active_score_path)
+        return payload
+
+    def _resolve_effective_score_fn(self) -> tuple[SelectionCallable, str, str | None]:
+        if self._installed_score_fn is not None:
+            return self._installed_score_fn, "installed", self._active_score_id
+        if self._require_score_install:
+            raise RuntimeError("score install required before evaluator tools can run")
+
+        score_fn, score_source = _resolve_fallback_score_fn(self._score_fn)
+        return score_fn, score_source, None
+
+    def _resolve_and_expand(
+        self,
+        arguments: dict[str, Any],
+        score_fn: SelectionCallable,
+        score_source: str,
+        active_score_id: str | None,
+    ) -> dict[str, Any]:
+        symbol = _require_str(arguments, "symbol")
+        depth = _require_int(arguments, "depth")
+        self._ensure_graph_ready()
+
+        node = _resolve_symbol(symbol)
+        if node is None:
+            return {
+                "node": None,
+                "graph": {"nodes": [], "edges": [], "metadata": {}},
+                "full_graph": _serialize_active_graph(),
+                "score_source": score_source,
+                "active_score_id": active_score_id,
+            }
+
+        return {
+            "node": node,
+            "graph": exploration.expand(node["id"], depth=depth, score_fn=score_fn),
+            "full_graph": _serialize_active_graph(),
+            "score_source": score_source,
+            "active_score_id": active_score_id,
+        }
 
 
 def _require_str(arguments: dict[str, Any], key: str) -> str:
@@ -177,6 +306,27 @@ def _require_int(arguments: dict[str, Any], key: str) -> int:
     return value
 
 
+def load_policy_callable(policy_path: str | Path, symbol: str = "score_fn") -> SelectionCallable:
+    path = Path(policy_path).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"policy module not found: {path}")
+
+    module_name = f"iterative_context_installed_policy_{abs(hash(str(path)))}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"unable to load policy module from {path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    candidate = getattr(module, symbol, None)
+    if candidate is None and symbol == "score_fn":
+        candidate = getattr(module, "score", None)
+    if not callable(candidate):
+        raise ValueError(f"policy module {path} does not define callable {symbol}")
+    return cast(SelectionCallable, candidate)
+
+
 def load_local_policy() -> SelectionCallable | None:
     """Dynamically load a local policy module if present."""
     try:
@@ -190,7 +340,7 @@ def load_local_policy() -> SelectionCallable | None:
     return None
 
 
-def _resolve_effective_score_fn(
+def _resolve_fallback_score_fn(
     injected_score_fn: SelectionCallable | None,
 ) -> tuple[SelectionCallable, str]:
     """Resolve the scoring function with explicit precedence."""
@@ -211,8 +361,24 @@ async def list_tools() -> list[Tool]:
     return await _default_runtime.list_tools()
 
 
+async def list_admin_tools() -> list[Tool]:
+    return await _default_runtime.list_admin_tools()
+
+
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     return await _default_runtime.call_tool(name, arguments)
+
+
+async def install_score(
+    policy_path: str, policy_id: str, symbol: str = "score_fn"
+) -> dict[str, Any]:
+    return _default_runtime._install_score(
+        {"policy_path": policy_path, "policy_id": policy_id, "symbol": symbol}
+    )
+
+
+async def verify_score(policy_id: str) -> dict[str, Any]:
+    return _default_runtime._verify_score({"policy_id": policy_id})
 
 
 @server.list_tools()
@@ -231,5 +397,9 @@ __all__ = [
     "server",
     "IterativeContextToolRuntime",
     "list_tools",
+    "list_admin_tools",
     "call_tool",
+    "install_score",
+    "verify_score",
+    "load_policy_callable",
 ]

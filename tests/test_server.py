@@ -11,15 +11,22 @@ import pytest
 from iterative_context import exploration, server
 from iterative_context.exploration import _repo_signature, _set_active_graph
 from iterative_context.graph_models import Graph, GraphNode
-from iterative_context.server import IterativeContextToolRuntime, call_tool, list_tools
+from iterative_context.server import (
+    IterativeContextToolRuntime,
+    call_tool,
+    list_admin_tools,
+    list_tools,
+)
 from iterative_context.test_helpers.graph_dsl import build_graph
 
 
 @pytest.fixture(autouse=True)
 def _reset_active_graph() -> Iterator[None]:  # pyright: ignore[reportUnusedFunction]
     exploration._clear_active_graph()
+    server._default_runtime.clear_score_install()
     yield
     exploration._clear_active_graph()
+    server._default_runtime.clear_score_install()
 
 
 def _make_graph_with_symbols() -> Graph:
@@ -60,6 +67,19 @@ async def test_list_tools_definitions() -> None:
     expand_tool = next(tool for tool in tools if tool.name == "expand")
     assert expand_tool.inputSchema["properties"]["depth"]["type"] == "integer"
     assert "node_id" in expand_tool.inputSchema["required"]
+
+
+@pytest.mark.anyio
+async def test_list_admin_tools_definitions() -> None:
+    tools = await list_admin_tools()
+    names = {tool.name for tool in tools}
+    assert names == {"install_score", "verify_score"}
+
+    install_tool = next(tool for tool in tools if tool.name == "install_score")
+    assert install_tool.inputSchema["required"] == ["policy_path", "policy_id"]
+
+    verify_tool = next(tool for tool in tools if tool.name == "verify_score")
+    assert verify_tool.inputSchema["required"] == ["policy_id"]
 
 
 @pytest.mark.anyio
@@ -179,6 +199,73 @@ async def test_runtime_falls_back_to_default_when_policy_missing(
 
     assert score_calls
     assert payload["score_source"] == "default"
+
+
+def _write_policy(root: Path, *, score_value: float = 7.0) -> Path:
+    path = root / "policy.py"
+    path.write_text(
+        (
+            "def score_fn(node, graph, step):\n"
+            f"    return {score_value}\n"
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.mark.anyio
+async def test_runtime_requires_install_before_evaluator_tools(tmp_path: Path) -> None:
+    _activate_graph_with_symbols()
+    runtime = IterativeContextToolRuntime(require_score_install=True)
+
+    blocked = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
+    blocked_payload = json.loads(blocked[0].text)
+    assert "error" in blocked_payload
+    assert "score install required" in blocked_payload["error"]
+
+    policy_path = _write_policy(tmp_path, score_value=11.0)
+    installed = await runtime.call_tool(
+        "install_score",
+        {"policy_path": str(policy_path), "policy_id": "policy-v1"},
+    )
+    install_payload = json.loads(installed[0].text)
+
+    assert install_payload["ok"] is True
+    assert install_payload["policy_id"] == "policy-v1"
+    assert install_payload["score_source"] == "installed"
+
+    expanded = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
+    expanded_payload = json.loads(expanded[0].text)
+    assert expanded_payload["score_source"] == "installed"
+    assert expanded_payload["active_score_id"] == "policy-v1"
+    assert expanded_payload["graph"]["metadata"]["expanded_from"] == "A"
+
+
+@pytest.mark.anyio
+async def test_runtime_verify_score_reports_missing_and_mismatch(tmp_path: Path) -> None:
+    runtime = IterativeContextToolRuntime()
+
+    missing = await runtime.call_tool("verify_score", {"policy_id": "policy-v1"})
+    missing_payload = json.loads(missing[0].text)
+    assert "error" in missing_payload
+    assert "no score installed" in missing_payload["error"]
+
+    policy_path = _write_policy(tmp_path, score_value=5.0)
+    await runtime.call_tool(
+        "install_score",
+        {"policy_path": str(policy_path), "policy_id": "policy-v1"},
+    )
+
+    mismatch = await runtime.call_tool("verify_score", {"policy_id": "policy-v2"})
+    mismatch_payload = json.loads(mismatch[0].text)
+    assert "error" in mismatch_payload
+    assert "expected policy-v2, got policy-v1" in mismatch_payload["error"]
+
+    verified = await runtime.call_tool("verify_score", {"policy_id": "policy-v1"})
+    verified_payload = json.loads(verified[0].text)
+    assert verified_payload["ok"] is True
+    assert verified_payload["policy_id"] == "policy-v1"
+    assert verified_payload["score_source"] == "installed"
 
 
 def _write_repo(root: Path, symbol: str) -> Path:
