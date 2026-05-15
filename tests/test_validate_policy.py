@@ -7,8 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 from iterative_context.validate_policy import main as validate_main, validate_policy
 
 
