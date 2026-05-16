@@ -1,4 +1,11 @@
-load("@prelude//:rules.bzl", "sh_test", "test_suite")
+load("@prelude//:rules.bzl", "genrule", "sh_test", "test_suite")
+
+genrule(
+    name = "optimizable_backend",
+    out = "optimizable_backend.json",
+    srcs = ["optimizable_backend.json"],
+    cmd = "cp $SRCS $OUT",
+)
 
 sh_test(
     name = "import_smoke",

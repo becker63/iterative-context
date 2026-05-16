@@ -1,0 +1,30 @@
+{
+  "kind": "searchbench.optimizable_backend.v1",
+  "source": {
+    "kind": "local_path",
+    "path": "src/iterative-context",
+    "declared_by": "//src/iterative-context:optimizable_backend"
+  },
+  "launcher": {
+    "kind": "mcp_stdio",
+    "cwd_mode": "candidate_workspace",
+    "argv": ["uv", "run", "python", "-m", "iterative_context.server"],
+    "env": {}
+  },
+  "candidate_validator": {
+    "kind": "ic_policy_pipeline",
+    "steps": [
+      "stage_policy",
+      "py_compile",
+      "validate_policy",
+      "basedpyright",
+      "ruff_check",
+      "pytest"
+    ]
+  },
+  "runtime_admin": {
+    "install_tool": "install_score",
+    "verify_tool": "verify_score",
+    "hidden_from_evaluator": true
+  }
+}
