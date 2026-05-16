@@ -403,6 +403,22 @@ async def _server_call_tool(  # pyright: ignore[reportUnusedFunction]
     return await call_tool(name, arguments)
 
 
+def main() -> None:
+    """Run the MCP server over stdio (for SearchBench and other MCP clients)."""
+    import anyio
+    from mcp.server.stdio import stdio_server
+
+    async def run() -> None:
+        async with stdio_server() as (read_stream, write_stream):
+            await server.run(read_stream, write_stream, server.create_initialization_options())
+
+    anyio.run(run)
+
+
+if __name__ == "__main__":
+    main()
+
+
 __all__ = [
     "server",
     "IterativeContextToolRuntime",
@@ -412,4 +428,5 @@ __all__ = [
     "install_score",
     "verify_score",
     "load_policy_callable",
+    "main",
 ]
