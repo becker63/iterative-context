@@ -1,4 +1,5 @@
-load("@prelude//:rules.bzl", "genrule", "sh_test", "test_suite")
+load("//build_defs:tool_ops.bzl", "uv_project_test")
+load("@prelude//:rules.bzl", "genrule", "test_suite")
 
 genrule(
     name = "optimizable_backend",
@@ -7,19 +8,42 @@ genrule(
     cmd = "cp $SRCS $OUT",
 )
 
-sh_test(
+uv_project_test(
     name = "import_smoke",
-    test = "buck_import_smoke.sh",
+    work_dir = "src/iterative-context",
+    argv = [
+        "run",
+        "python",
+        "tools/buck_import_smoke.py",
+    ],
 )
 
-sh_test(
+uv_project_test(
     name = "pytest_all",
-    test = "buck_pytest.sh",
+    work_dir = "src/iterative-context",
+    argv = [
+        "run",
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "--ignore=tests/test_graph_store.py",
+        "--ignore=tests/test_ingest_llm_tldr.py",
+        "--ignore=tests/test_llm_tldr_normalization.py",
+    ],
 )
 
-sh_test(
+uv_project_test(
     name = "basedpyright_check",
-    test = "buck_basedpyright.sh",
+    work_dir = "src/iterative-context",
+    argv = [
+        "run",
+        "python",
+        "-m",
+        "basedpyright",
+        "src",
+        "tests",
+    ],
 )
 
 # Fast gate (pre-commit aggregate): locked env sync, import smoke, pytest (excludes TEST_REPO_* fixtures).
