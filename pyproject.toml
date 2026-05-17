@@ -10,7 +10,6 @@ dependencies = [
     "rx>=3.0",
     "pytest>=8.0",
     "pytest-snapshot>=0.9",
-    "rxpy>=0.1.0",
     "basedpyright>=1.5.0",
     "ruff>=0.4.0",
     "hypothesis>=6.151.9",
@@ -48,6 +47,7 @@ ignore = []
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+anyio_mode = "asyncio"
 
 [dependency-groups]
 dev = [
