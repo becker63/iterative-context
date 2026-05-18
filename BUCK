@@ -13,9 +13,9 @@ uv_project_test(
     work_dir = "src/iterative-context",
     argv = [
         "run",
-        "pytest",
-        "tests/test_import_smoke.py",
-        "-q",
+        "python",
+        "-c",
+        "import iterative_context",
     ],
 )
 
