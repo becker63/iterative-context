@@ -92,7 +92,8 @@ async def test_call_tool_resolve_serializes_node() -> None:
     assert payload["node"]["id"] == "A"
     assert payload["node"]["symbol"] == "expand_node"
     assert "file" in payload["node"]
-    assert payload["full_graph"]["nodes"]
+    assert payload["full_graph"]["format"] == "summary_v1"
+    assert payload["full_graph"]["node_count"] >= 1
     assert payload["score_source"] == "local_policy"
 
 
@@ -107,7 +108,8 @@ async def test_call_tool_expand_returns_graph() -> None:
     assert graph["metadata"]["expanded_from"] == "A"
     assert graph["metadata"]["depth"] == 1
     assert graph["nodes"]
-    assert payload["full_graph"]["nodes"]
+    assert payload["full_graph"]["format"] == "summary_v1"
+    assert payload["full_graph"]["node_count"] >= 1
     assert payload["score_source"] == "local_policy"
 
 
@@ -120,7 +122,8 @@ async def test_call_tool_resolve_and_expand() -> None:
 
     assert payload["graph"]["metadata"]["expanded_from"] == "A"
     assert payload["graph"]["nodes"]
-    assert payload["full_graph"]["nodes"]
+    assert payload["full_graph"]["format"] == "summary_v1"
+    assert payload["full_graph"]["node_count"] >= 1
     assert payload["score_source"] == "local_policy"
 
 

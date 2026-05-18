@@ -11,7 +11,7 @@ from mcp.types import TextContent, Tool
 
 from iterative_context import exploration
 from iterative_context.scoring import default_score_fn
-from iterative_context.serialization import serialize_graph, serialize_node
+from iterative_context.serialization import serialize_graph_summary, serialize_node
 from iterative_context.types import SelectionCallable
 
 server = Server("iterative-context")
@@ -33,12 +33,11 @@ def _resolve_symbol(symbol: str) -> dict[str, Any] | None:
 
 
 def _serialize_active_graph() -> dict[str, Any]:
+    """Return a compact digest of the active graph (not full node/edge lists)."""
     graph = exploration.get_active_graph()
     metadata: dict[str, Any] = {"source": "active_graph"}
     metadata.update(exploration.get_active_repo_metadata())
-    if graph is None:
-        return {"nodes": [], "edges": [], "metadata": metadata}
-    return serialize_graph(graph, metadata=metadata)
+    return serialize_graph_summary(graph, metadata=metadata)
 
 
 def _tool_definitions() -> list[Tool]:
