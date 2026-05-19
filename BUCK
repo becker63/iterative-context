@@ -1,4 +1,4 @@
-load("//build/defs:tool_ops.bzl", "uv_project_test")
+load("//buck/defs:tool_ops.bzl", "uv_project_test")
 load("@prelude//:rules.bzl", "genrule", "test_suite")
 
 genrule(
