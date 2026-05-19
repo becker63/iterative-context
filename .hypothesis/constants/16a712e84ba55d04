@@ -1,0 +1,4 @@
+# file: /home/becker/projects/searchbench-go/src/iterative-context/src/iterative_context/serialization.py
+# hypothesis_version: 6.151.9
+
+['.py', '/', '\\', 'data', 'edge_count', 'edges', 'edges_by_kind', 'file', 'files_sample', 'files_total', 'files_truncated', 'format', 'function', 'id', 'kind', 'metadata', 'node_count', 'nodes', 'nodes_by_kind', 'nodes_by_state', 'references', 'repo_root', 'serialize_graph', 'serialize_node', 'source', 'state', 'summary_v1', 'symbol', 'symbols_sample', 'symbols_total', 'symbols_truncated', 'target', 'tokens', 'type']
