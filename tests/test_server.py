@@ -61,8 +61,11 @@ async def test_list_tools_definitions() -> None:
     assert names == {"resolve", "expand", "resolve_and_expand"}
 
     resolve_tool = next(tool for tool in tools if tool.name == "resolve")
-    assert resolve_tool.inputSchema["required"] == ["symbol"]
+    assert resolve_tool.inputSchema["required"] == []
     assert resolve_tool.inputSchema["properties"]["symbol"]["type"] == "string"
+
+    rex = next(tool for tool in tools if tool.name == "resolve_and_expand")
+    assert rex.inputSchema["required"] == []
 
     expand_tool = next(tool for tool in tools if tool.name == "expand")
     assert expand_tool.inputSchema["properties"]["depth"]["type"] == "integer"
@@ -111,6 +114,29 @@ async def test_call_tool_expand_returns_graph() -> None:
     assert payload["full_graph"]["format"] == "summary_v1"
     assert payload["full_graph"]["node_count"] >= 1
     assert payload["score_source"] == "local_policy"
+
+
+@pytest.mark.anyio
+async def test_call_tool_resolve_accepts_query_alias() -> None:
+    _activate_graph_with_symbols()
+
+    response = await call_tool("resolve", {"query": "expand_node"})
+    payload = json.loads(response[0].text)
+
+    assert payload["node"]["id"] == "A"
+    assert payload["node"]["symbol"] == "expand_node"
+
+
+@pytest.mark.anyio
+async def test_call_tool_resolve_and_expand_accepts_query_and_default_depth() -> None:
+    _activate_graph_with_symbols()
+
+    response = await call_tool("resolve_and_expand", {"query": "expand_node"})
+    payload = json.loads(response[0].text)
+
+    assert payload["graph"]["metadata"]["expanded_from"] == "A"
+    assert payload["graph"]["metadata"]["depth"] == 1
+    assert payload["graph"]["nodes"]
 
 
 @pytest.mark.anyio

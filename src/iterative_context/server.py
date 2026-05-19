@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import json
+import math
 from pathlib import Path
 from typing import Any, cast
 
@@ -15,6 +16,8 @@ from iterative_context.serialization import serialize_graph_summary, serialize_n
 from iterative_context.types import SelectionCallable
 
 server = Server("iterative-context")
+
+_DEPTH_FLOAT_TOLERANCE = 1e-9
 
 
 def _resolve_symbol(symbol: str) -> dict[str, Any] | None:
@@ -44,13 +47,23 @@ def _tool_definitions() -> list[Tool]:
     return [
         Tool(
             name="resolve",
-            description="Resolve a symbol to a graph node if present.",
+            description=(
+                "Resolve a symbol to a graph node if present. Provide symbol (preferred), "
+                "or query — an alias carrying the same string when models emit generic search text."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "symbol": {"type": "string", "description": "Symbol identifier to resolve"}
+                    "symbol": {
+                        "type": "string",
+                        "description": "Anchor string to resolve (identifier or searchable text).",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Alias of symbol for tool-call ergonomics.",
+                    },
                 },
-                "required": ["symbol"],
+                "required": [],
             },
         ),
         Tool(
@@ -71,18 +84,28 @@ def _tool_definitions() -> list[Tool]:
         ),
         Tool(
             name="resolve_and_expand",
-            description="Resolve a symbol and expand its neighborhood.",
+            description=(
+                "Resolve a symbol and expand its neighborhood. Provide symbol or query "
+                "(alias). Depth defaults to 1 when omitted."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "symbol": {"type": "string", "description": "Symbol identifier to resolve"},
+                    "symbol": {
+                        "type": "string",
+                        "description": "Anchor passed to resolve (identifier or searchable text).",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Alias of symbol for models that omit symbol.",
+                    },
                     "depth": {
                         "type": "integer",
                         "minimum": 0,
-                        "description": "Expansion depth to explore",
+                        "description": "Expansion depth to explore (defaults to 1).",
                     },
                 },
-                "required": ["symbol", "depth"],
+                "required": [],
             },
         ),
     ]
@@ -174,7 +197,7 @@ class IterativeContextToolRuntime:
 
         score_fn, score_source, active_score_id = self._resolve_effective_score_fn()
         if tool_name == "resolve":
-            symbol = _require_str(arguments, "symbol")
+            symbol = _take_anchor_symbol(arguments)
             self._ensure_graph_ready()
             return {
                 "node": _resolve_symbol(symbol),
@@ -278,8 +301,8 @@ class IterativeContextToolRuntime:
         score_source: str,
         active_score_id: str | None,
     ) -> dict[str, Any]:
-        symbol = _require_str(arguments, "symbol")
-        depth = _require_int(arguments, "depth")
+        symbol = _take_anchor_symbol(arguments)
+        depth = _take_depth(arguments, default=1)
         self._ensure_graph_ready()
 
         node = _resolve_symbol(symbol)
@@ -299,6 +322,36 @@ class IterativeContextToolRuntime:
             "score_source": score_source,
             "active_score_id": active_score_id,
         }
+
+
+def _take_anchor_symbol(arguments: dict[str, Any]) -> str:
+    sym = arguments.get("symbol")
+    q = arguments.get("query")
+    if isinstance(sym, str) and sym.strip():
+        return sym.strip()
+    if isinstance(q, str) and q.strip():
+        return q.strip()
+    raise ValueError("provide symbol or query (non-empty string)")
+
+
+def _take_depth(arguments: dict[str, Any], default: int) -> int:
+    if "depth" not in arguments or arguments["depth"] is None:
+        return default
+    v = arguments["depth"]
+    if isinstance(v, bool):
+        raise ValueError("depth must be an integer")
+    if isinstance(v, int):
+        if v < 0:
+            raise ValueError("depth must be >= 0")
+        return v
+    if isinstance(v, float) and math.isfinite(v):
+        rounded = round(v)
+        if abs(v - rounded) > _DEPTH_FLOAT_TOLERANCE:
+            raise ValueError("depth must be an integer")
+        if rounded < 0:
+            raise ValueError("depth must be >= 0")
+        return int(rounded)
+    raise ValueError("depth must be an integer")
 
 
 def _require_str(arguments: dict[str, Any], key: str) -> str:
@@ -404,8 +457,8 @@ async def _server_call_tool(  # pyright: ignore[reportUnusedFunction]
 
 def main() -> None:
     """Run the MCP server over stdio (for SearchBench and other MCP clients)."""
-    import anyio
-    from mcp.server.stdio import stdio_server
+    import anyio  # noqa: PLC0415
+    from mcp.server.stdio import stdio_server  # noqa: PLC0415
 
     async def run() -> None:
         async with stdio_server() as (read_stream, write_stream):
