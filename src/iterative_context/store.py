@@ -3,7 +3,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
-from iterative_context.fuzzy_rank import pick_unique_or_ambiguous
+from iterative_context.fuzzy_rank import pick_unique_or_ambiguous, rank_symbol_candidates
 from iterative_context.graph_models import Graph, GraphEdge, GraphNode
 
 
@@ -106,11 +106,7 @@ class GraphStore:
             if node:
                 return node
 
-        symbols: list[tuple[str, str]] = []
-        for sym, ids in self.index_by_symbol.items():
-            if not ids:
-                continue
-            symbols.append((sorted(ids)[0], sym))
+        symbols = self._symbol_index()
         winner, _ambiguous = pick_unique_or_ambiguous(query, symbols)
         if winner is not None:
             return self._node_for_id(winner.node_id)
@@ -124,15 +120,25 @@ class GraphStore:
 
         return None
 
-    def resolve_candidates(self, query: str) -> list[dict[str, object]]:
-        """Return ranked candidates for ambiguous or failed exact resolve."""
+    def _symbol_index(self) -> list[tuple[str, str]]:
         symbols: list[tuple[str, str]] = []
         for sym, ids in self.index_by_symbol.items():
             if ids:
                 symbols.append((sorted(ids)[0], sym))
+        return symbols
+
+    def resolve_candidates(self, query: str, *, limit: int = 8) -> list[dict[str, object]]:
+        """Return ranked candidates for ambiguous or below-threshold resolve."""
+        symbols = self._symbol_index()
         _winner, ambiguous = pick_unique_or_ambiguous(query, symbols)
+        if ambiguous:
+            ranked = ambiguous
+        elif _winner is not None:
+            return []
+        else:
+            ranked = rank_symbol_candidates(query, symbols)[:limit]
         out: list[dict[str, object]] = []
-        for c in ambiguous:
+        for c in ranked:
             out.append(
                 {
                     "node_id": c.node_id,

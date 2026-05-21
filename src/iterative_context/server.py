@@ -13,6 +13,7 @@ from mcp.types import TextContent, Tool
 from iterative_context import exploration
 from iterative_context.scoring import default_score_fn
 from iterative_context.serialization import serialize_graph_summary, serialize_node
+from iterative_context.graph_models import GraphNode
 from iterative_context.types import SelectionCallable
 
 server = Server("iterative-context")
@@ -20,24 +21,61 @@ server = Server("iterative-context")
 _DEPTH_FLOAT_TOLERANCE = 1e-9
 
 
-def _resolve_symbol(symbol: str) -> dict[str, Any] | None:
-    """Look up a symbol and serialize it with any graph extras."""
-    node = exploration.resolve(symbol)
-    if node is None:
-        store = exploration.get_active_store()
-        if store is not None:
-            candidates = store.resolve_candidates(symbol)
-            if candidates:
-                return {"candidates": candidates, "query": symbol}
-        return None
-
+def _serialize_resolved_node(node: GraphNode) -> dict[str, Any]:
+    """Serialize a resolved graph node with any graph extras."""
     graph = exploration.get_active_graph()
     extras: dict[str, Any] = {}
     if graph is not None and node.id in graph.nodes:
         raw = graph.nodes[node.id]
         extras = {k: v for k, v in raw.items() if k != "data"}
-
     return serialize_node(node, extras)
+
+
+def _resolve_lookup(symbol: str) -> tuple[dict[str, Any] | None, list[dict[str, object]] | None]:
+    """
+    Resolve a symbol to a node and/or ranked candidates.
+
+    Returns (node, candidates). On unique match, node is set and candidates is None.
+    On ambiguity or below-threshold miss, node is None and candidates lists top matches.
+    """
+    node = exploration.resolve(symbol)
+    if node is not None:
+        return _serialize_resolved_node(node), None
+
+    store = exploration.get_active_store()
+    if store is None:
+        return None, None
+
+    candidates = store.resolve_candidates(symbol)
+    if candidates:
+        return None, candidates
+    return None, None
+
+
+def _empty_expansion_graph() -> dict[str, Any]:
+    return {"nodes": [], "edges": [], "metadata": {}}
+
+
+def _resolve_tool_payload(
+    symbol: str,
+    *,
+    score_source: str,
+    active_score_id: str | None,
+    include_graph: bool = False,
+) -> dict[str, Any]:
+    node, candidates = _resolve_lookup(symbol)
+    payload: dict[str, Any] = {
+        "node": node,
+        "full_graph": _serialize_active_graph(),
+        "score_source": score_source,
+        "active_score_id": active_score_id,
+    }
+    if include_graph:
+        payload["graph"] = _empty_expansion_graph()
+    if candidates is not None:
+        payload["candidates"] = candidates
+        payload["query"] = symbol
+    return payload
 
 
 def _serialize_active_graph() -> dict[str, Any]:
@@ -204,12 +242,11 @@ class IterativeContextToolRuntime:
         if tool_name == "resolve":
             symbol = _take_anchor_symbol(arguments)
             self._ensure_graph_ready()
-            return {
-                "node": _resolve_symbol(symbol),
-                "full_graph": _serialize_active_graph(),
-                "score_source": score_source,
-                "active_score_id": active_score_id,
-            }
+            return _resolve_tool_payload(
+                symbol,
+                score_source=score_source,
+                active_score_id=active_score_id,
+            )
 
         if tool_name == "expand":
             node_id = _require_str(arguments, "node_id")
@@ -310,11 +347,19 @@ class IterativeContextToolRuntime:
         depth = _take_depth(arguments, default=1)
         self._ensure_graph_ready()
 
-        node = _resolve_symbol(symbol)
+        node, candidates = _resolve_lookup(symbol)
+        if candidates is not None:
+            return _resolve_tool_payload(
+                symbol,
+                score_source=score_source,
+                active_score_id=active_score_id,
+                include_graph=True,
+            )
+
         if node is None:
             return {
                 "node": None,
-                "graph": {"nodes": [], "edges": [], "metadata": {}},
+                "graph": _empty_expansion_graph(),
                 "full_graph": _serialize_active_graph(),
                 "score_source": score_source,
                 "active_score_id": active_score_id,

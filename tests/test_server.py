@@ -154,6 +154,81 @@ async def test_call_tool_resolve_and_expand() -> None:
 
 
 @pytest.mark.anyio
+async def test_call_tool_resolve_ambiguous_returns_null_node_and_candidates() -> None:
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": "A", "kind": "symbol", "state": "pending"},
+                {"id": "B", "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [],
+        }
+    )
+    graph.nodes["A"]["symbol"] = "fetch_user_data"
+    graph.nodes["B"]["symbol"] = "fetch_user_info"
+    signature = _repo_signature(Path.cwd())
+    _set_active_graph(graph, repo_root=Path.cwd().resolve(), signature=signature)
+
+    response = await call_tool("resolve", {"query": "fetch_user"})
+    payload = json.loads(response[0].text)
+
+    assert payload["node"] is None
+    assert len(payload["candidates"]) == 2
+    assert payload["query"] == "fetch_user"
+    assert "candidates" not in (payload["node"] or {})
+
+
+@pytest.mark.anyio
+async def test_call_tool_resolve_and_expand_ambiguous_returns_candidates() -> None:
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": "A", "kind": "symbol", "state": "pending"},
+                {"id": "B", "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [],
+        }
+    )
+    graph.nodes["A"]["symbol"] = "fetch_user_data"
+    graph.nodes["B"]["symbol"] = "fetch_user_info"
+    signature = _repo_signature(Path.cwd())
+    _set_active_graph(graph, repo_root=Path.cwd().resolve(), signature=signature)
+
+    response = await call_tool("resolve_and_expand", {"query": "fetch_user", "depth": 1})
+    payload = json.loads(response[0].text)
+
+    assert payload["node"] is None
+    assert len(payload["candidates"]) == 2
+    assert payload["query"] == "fetch_user"
+    assert payload["graph"]["nodes"] == []
+    assert payload["graph"]["edges"] == []
+
+
+@pytest.mark.anyio
+async def test_call_tool_resolve_below_threshold_returns_top_candidates() -> None:
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": "A", "kind": "symbol", "state": "pending"},
+                {"id": "B", "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [],
+        }
+    )
+    graph.nodes["A"]["symbol"] = "expand_node"
+    graph.nodes["B"]["symbol"] = "other_symbol"
+    signature = _repo_signature(Path.cwd())
+    _set_active_graph(graph, repo_root=Path.cwd().resolve(), signature=signature)
+
+    response = await call_tool("resolve", {"query": "zzz_no_match"})
+    payload = json.loads(response[0].text)
+
+    assert payload["node"] is None
+    assert len(payload["candidates"]) >= 1
+    assert payload["query"] == "zzz_no_match"
+
+
+@pytest.mark.anyio
 async def test_call_tool_unknown_returns_error() -> None:
     _activate_graph_with_symbols()
 
