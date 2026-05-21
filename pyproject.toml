@@ -15,6 +15,7 @@ dependencies = [
     "hypothesis>=6.151.9",
     "llm-tldr>=1.5.2",
     "mcp>=1.26.0",
+    "rapidfuzz>=3.0",
 ]
 
 [build-system]

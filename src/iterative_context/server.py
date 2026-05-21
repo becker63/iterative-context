@@ -24,6 +24,11 @@ def _resolve_symbol(symbol: str) -> dict[str, Any] | None:
     """Look up a symbol and serialize it with any graph extras."""
     node = exploration.resolve(symbol)
     if node is None:
+        store = exploration.get_active_store()
+        if store is not None:
+            candidates = store.resolve_candidates(symbol)
+            if candidates:
+                return {"candidates": candidates, "query": symbol}
         return None
 
     graph = exploration.get_active_graph()

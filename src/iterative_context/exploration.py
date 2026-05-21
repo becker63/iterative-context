@@ -57,6 +57,11 @@ def get_active_graph() -> Graph | None:
     return _active_graph
 
 
+def get_active_store() -> GraphStore | None:
+    """Return the read-only store for the active graph, if any."""
+    return _active_store
+
+
 def _repo_signature(root: Path) -> str:
     """Compute a deterministic signature of Python sources under root."""
     hasher = hashlib.sha256()

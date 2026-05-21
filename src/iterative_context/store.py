@@ -3,6 +3,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
+from iterative_context.fuzzy_rank import pick_unique_or_ambiguous
 from iterative_context.graph_models import Graph, GraphEdge, GraphNode
 
 
@@ -95,7 +96,7 @@ class GraphStore:
 
     def resolve(self, query: str) -> GraphNode | None:
         """
-        Deterministic lookup using symbol/file indexes only.
+        Deterministic lookup using symbol/file indexes, then bounded fuzzy ranking.
 
         No traversal or mutation.
         """
@@ -105,13 +106,16 @@ class GraphStore:
             if node:
                 return node
 
-        lowered = query.lower()
-        for sym, ids in sorted(self.index_by_symbol.items(), key=lambda item: item[0]):
-            if lowered in sym.lower():
-                node = self._node_for_id(ids[0])
-                if node:
-                    return node
+        symbols: list[tuple[str, str]] = []
+        for sym, ids in self.index_by_symbol.items():
+            if not ids:
+                continue
+            symbols.append((sorted(ids)[0], sym))
+        winner, _ambiguous = pick_unique_or_ambiguous(query, symbols)
+        if winner is not None:
+            return self._node_for_id(winner.node_id)
 
+        lowered = query.lower()
         for path, ids in sorted(self.index_by_file.items(), key=lambda item: item[0]):
             if lowered in path.lower():
                 node = self._node_for_id(ids[0])
@@ -119,6 +123,25 @@ class GraphStore:
                     return node
 
         return None
+
+    def resolve_candidates(self, query: str) -> list[dict[str, object]]:
+        """Return ranked candidates for ambiguous or failed exact resolve."""
+        symbols: list[tuple[str, str]] = []
+        for sym, ids in self.index_by_symbol.items():
+            if ids:
+                symbols.append((sorted(ids)[0], sym))
+        _winner, ambiguous = pick_unique_or_ambiguous(query, symbols)
+        out: list[dict[str, object]] = []
+        for c in ambiguous:
+            out.append(
+                {
+                    "node_id": c.node_id,
+                    "symbol": c.symbol,
+                    "score": c.score,
+                    "reason": c.reason,
+                }
+            )
+        return out
 
     def get_neighbors(self, node_id: str, kinds: list[str] | None = None) -> list[str]:
         neighbors: set[str] = set()
