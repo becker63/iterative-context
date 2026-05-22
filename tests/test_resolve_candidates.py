@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+from typing import cast
+
 from iterative_context.store import GraphStore
-from iterative_context.test_helpers.graph_dsl import build_graph
+from iterative_context.test_helpers.graph_dsl import GraphSpec, NodeSpec, build_graph
 
 
 def _store_with_symbols(*symbols: tuple[str, str]) -> GraphStore:
-    nodes = [{"id": node_id, "kind": "symbol", "state": "pending"} for node_id, _ in symbols]
-    graph = build_graph({"nodes": nodes, "edges": []})
+    nodes: list[NodeSpec] = [
+        {"id": node_id, "kind": "symbol", "state": "pending"} for node_id, _ in symbols
+    ]
+    spec: GraphSpec = {"nodes": nodes, "edges": []}
+    graph = build_graph(spec)
     for node_id, symbol in symbols:
         graph.nodes[node_id]["symbol"] = symbol
     return GraphStore(graph)
@@ -30,7 +35,9 @@ def test_resolve_candidates_below_threshold_returns_top_n() -> None:
     )
     candidates = store.resolve_candidates("zzz_unrelated", limit=3)
     assert len(candidates) == 3
-    assert candidates[0]["score"] >= candidates[1]["score"]
+    first_score = cast(float, candidates[0]["score"])
+    second_score = cast(float, candidates[1]["score"])
+    assert first_score >= second_score
 
 
 def test_resolve_unique_winner_has_no_candidates_payload() -> None:
