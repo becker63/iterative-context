@@ -21,17 +21,25 @@ def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _install_verify_smoke(rt: IterativeContextToolRuntime, policy_path: Path, policy_id: str, symbol: str) -> None:
-    payload = rt.admin_install_score({"policy_path": str(policy_path), "policy_id": policy_id, "symbol": symbol})
+def _install_verify_smoke(
+    rt: IterativeContextToolRuntime, policy_path: Path, policy_id: str, symbol: str
+) -> None:
+    payload = rt.admin_install_policy(
+        {
+            "policy_path": str(policy_path),
+            "policy_id": policy_id,
+            "lookahead_policy_symbol": symbol,
+        }
+    )
     if not payload.get("ok"):
-        raise RuntimeError(f"install_score failed: {payload}")
-    verify = rt.admin_verify_score({"policy_id": policy_id})
+        raise RuntimeError(f"install_policy failed: {payload}")
+    verify = rt.admin_verify_policy({"policy_id": policy_id})
     if not verify.get("ok"):
-        raise RuntimeError(f"verify_score failed: {verify}")
+        raise RuntimeError(f"verify_policy failed: {verify}")
 
 
 async def _strict_requires_install_before_tools(rt: IterativeContextToolRuntime) -> dict[str, Any]:
-    """Evaluator tools must fail before install_score when require_score_install is set."""
+    """Evaluator tools must fail before install_policy succeeds."""
     resp = await rt.call_tool("resolve", {"symbol": "dummy-symbol"})
     payload = json.loads(resp[0].text)
     err = payload.get("error")
@@ -39,13 +47,15 @@ async def _strict_requires_install_before_tools(rt: IterativeContextToolRuntime)
         return {
             "name": "strict_tool_smoke",
             "ok": False,
-            "message": "expected evaluator tool to fail before install_score",
-            "hint": "require_score_install should reject tools until install_score succeeds",
+            "message": "expected evaluator tool to fail before install_policy",
+            "hint": "Evaluator tools should reject calls until install_policy succeeds.",
         }
     return {"name": "strict_tool_smoke", "ok": True}
 
 
-async def validate_policy_async(policy_path: Path, policy_id: str, symbol: str) -> dict[str, Any]:
+async def validate_policy_async(  # noqa: PLR0911
+    policy_path: Path, policy_id: str, symbol: str
+) -> dict[str, Any]:
     """Run staged validation and return a structured result dict."""
     stages: list[dict[str, Any]] = []
 
@@ -88,7 +98,10 @@ async def validate_policy_async(policy_path: Path, policy_id: str, symbol: str) 
             "ok": False,
             "stage": "symbol",
             "message": str(exc),
-            "hint": f"Export def {symbol}(node, graph, depth): ... conforming to SelectionCallable.",
+            "hint": (
+                f"Export def {symbol}(node, graph, step): "
+                "... returning a float traversal score."
+            ),
             "policy_id": policy_id,
             "symbol": symbol,
             "stages": stages,
@@ -96,7 +109,7 @@ async def validate_policy_async(policy_path: Path, policy_id: str, symbol: str) 
 
     stages.append({"name": "callable_symbol", "ok": True})
 
-    rt = IterativeContextToolRuntime(require_score_install=True)
+    rt = IterativeContextToolRuntime()
 
     strict = await _strict_requires_install_before_tools(rt)
     stages.append(strict)
@@ -123,8 +136,8 @@ async def validate_policy_async(policy_path: Path, policy_id: str, symbol: str) 
             "stages": stages,
         }
 
-    stages.append({"name": "install_score", "ok": True})
-    stages.append({"name": "verify_score", "ok": True})
+    stages.append({"name": "install_policy", "ok": True})
+    stages.append({"name": "verify_policy", "ok": True})
 
     resp = await rt.call_tool("resolve", {"symbol": "dummy-symbol"})
     after_payload = json.loads(resp[0].text)
@@ -132,8 +145,7 @@ async def validate_policy_async(policy_path: Path, policy_id: str, symbol: str) 
         {
             "name": "evaluator_identity_smoke",
             "ok": True,
-            "active_score_id": after_payload.get("active_score_id"),
-            "score_source": after_payload.get("score_source"),
+            "active_policy_id": after_payload.get("active_policy_id"),
         }
     )
 
@@ -153,8 +165,12 @@ def validate_policy(policy_path: Path, policy_id: str, symbol: str) -> dict[str,
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate a candidate Iterative Context policy module.")
-    parser.add_argument("--policy-path", required=True, help="Filesystem path to the policy .py file")
+    parser = argparse.ArgumentParser(
+        description="Validate a candidate Iterative Context policy module."
+    )
+    parser.add_argument(
+        "--policy-path", required=True, help="Filesystem path to the policy .py file"
+    )
     parser.add_argument("--policy-id", required=True, help="Stable policy identifier")
     parser.add_argument("--symbol", required=True, help="Callable symbol to load from the module")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON to stdout")

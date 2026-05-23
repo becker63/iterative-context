@@ -23,8 +23,8 @@
     ]
   },
   "runtime_admin": {
-    "install_tool": "install_score",
-    "verify_tool": "verify_score",
+    "install_tool": "install_policy",
+    "verify_tool": "verify_policy",
     "hidden_from_evaluator": true
   }
 }

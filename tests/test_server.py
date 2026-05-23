@@ -10,7 +10,7 @@ import pytest
 
 from iterative_context import exploration, server
 from iterative_context.exploration import _repo_signature, _set_active_graph
-from iterative_context.graph_models import Graph, GraphNode
+from iterative_context.graph_models import Graph
 from iterative_context.server import (
     IterativeContextToolRuntime,
     call_tool,
@@ -23,10 +23,10 @@ from iterative_context.test_helpers.graph_dsl import build_graph
 @pytest.fixture(autouse=True)
 def _reset_active_graph() -> Iterator[None]:  # pyright: ignore[reportUnusedFunction]
     exploration._clear_active_graph()
-    server._default_runtime.clear_score_install()
+    server._default_runtime.clear_policy_install()
     yield
     exploration._clear_active_graph()
-    server._default_runtime.clear_score_install()
+    server._default_runtime.clear_policy_install()
 
 
 def _make_graph_with_symbols() -> Graph:
@@ -54,6 +54,89 @@ def _activate_graph_with_symbols() -> None:
     _set_active_graph(graph, repo_root=Path.cwd().resolve(), signature=signature)
 
 
+def _write_policy(root: Path, *, score_value: float = 7.0) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / "policy.py"
+    path.write_text(
+        (
+            "def lookahead_policy(node, graph, step):\n"
+            f"    return {score_value}\n"
+            "\n"
+            "def resolve_policy(query, candidates, state):\n"
+            "    exact = [\n"
+            "        candidate\n"
+            "        for candidate in candidates\n"
+            "        if (candidate.metadata or {}).get('match_source') == 'exact_symbol'\n"
+            "    ]\n"
+            "    if len(exact) == 1:\n"
+            "        chosen = exact[0]\n"
+            "        return {\n"
+            "            'status': 'resolved',\n"
+            "            'query_label': query,\n"
+            "            'candidates': [chosen],\n"
+            "            'selected_anchor_id': chosen.node_id,\n"
+            "            'reason': 'exact_symbol_match',\n"
+            "        }\n"
+            "    if not candidates:\n"
+            "        return {\n"
+            "            'status': 'not_found',\n"
+            "            'query_label': query,\n"
+            "            'candidates': [],\n"
+            "            'selected_anchor_id': None,\n"
+            "            'reason': 'no_candidates',\n"
+            "        }\n"
+            "    top = candidates[0]\n"
+            "    if top.score is None or top.score < 70.0:\n"
+            "        return {\n"
+            "            'status': 'not_found',\n"
+            "            'query_label': query,\n"
+            "            'candidates': candidates[:3],\n"
+            "            'selected_anchor_id': None,\n"
+            "            'reason': 'below_threshold',\n"
+            "        }\n"
+            "    if len(candidates) > 1:\n"
+            "        second = candidates[1]\n"
+            "        if (\n"
+            "            top.score is not None\n"
+            "            and second.score is not None\n"
+            "            and abs(top.score - second.score) <= 5.0\n"
+            "        ):\n"
+            "            return {\n"
+            "                'status': 'ambiguous',\n"
+            "                'query_label': query,\n"
+            "                'candidates': candidates[:2],\n"
+            "                'selected_anchor_id': None,\n"
+            "                'reason': 'ambiguous_top_candidates',\n"
+            "            }\n"
+            "    return {\n"
+            "        'status': 'resolved',\n"
+            "        'query_label': query,\n"
+            "        'candidates': candidates[:3],\n"
+            "        'selected_anchor_id': top.node_id,\n"
+            "        'reason': 'top_candidate',\n"
+            "        'shallow_expand': False,\n"
+            "    }\n"
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+async def _install_test_policy(
+    tmp_path: Path,
+    *,
+    runtime: IterativeContextToolRuntime | None = None,
+    score_value: float = 7.0,
+    policy_id: str = "policy-v1",
+) -> None:
+    policy_path = _write_policy(tmp_path, score_value=score_value)
+    tool_runtime = runtime or server._default_runtime
+    payload = tool_runtime.admin_install_policy(
+        {"policy_path": str(policy_path), "policy_id": policy_id}
+    )
+    assert payload["ok"] is True
+
+
 @pytest.mark.anyio
 async def test_list_tools_definitions() -> None:
     tools = await list_tools()
@@ -76,33 +159,36 @@ async def test_list_tools_definitions() -> None:
 async def test_list_admin_tools_definitions() -> None:
     tools = await list_admin_tools()
     names = {tool.name for tool in tools}
-    assert names == {"install_score", "verify_score"}
+    assert names == {"install_policy", "verify_policy", "describe_policy"}
 
-    install_tool = next(tool for tool in tools if tool.name == "install_score")
+    install_tool = next(tool for tool in tools if tool.name == "install_policy")
     assert install_tool.inputSchema["required"] == ["policy_path", "policy_id"]
 
-    verify_tool = next(tool for tool in tools if tool.name == "verify_score")
+    verify_tool = next(tool for tool in tools if tool.name == "verify_policy")
     assert verify_tool.inputSchema["required"] == ["policy_id"]
 
 
 @pytest.mark.anyio
-async def test_call_tool_resolve_serializes_node() -> None:
+async def test_call_tool_resolve_serializes_node(tmp_path: Path) -> None:
     _activate_graph_with_symbols()
+    await _install_test_policy(tmp_path)
 
     response = await call_tool("resolve", {"symbol": "expand_node"})
     payload = json.loads(response[0].text)
 
     assert payload["node"]["id"] == "A"
     assert payload["node"]["symbol"] == "expand_node"
+    assert payload["anchor_decision"]["status"] == "resolved"
+    assert payload["anchor_decision"]["selected_anchor_id"] == "A"
     assert "file" in payload["node"]
     assert payload["full_graph"]["format"] == "summary_v1"
     assert payload["full_graph"]["node_count"] >= 1
-    assert payload["score_source"] == "local_policy"
 
 
 @pytest.mark.anyio
-async def test_call_tool_expand_returns_graph() -> None:
+async def test_call_tool_expand_returns_graph(tmp_path: Path) -> None:
     _activate_graph_with_symbols()
+    await _install_test_policy(tmp_path)
 
     response = await call_tool("expand", {"node_id": "A", "depth": 1})
     payload = json.loads(response[0].text)
@@ -113,12 +199,12 @@ async def test_call_tool_expand_returns_graph() -> None:
     assert graph["nodes"]
     assert payload["full_graph"]["format"] == "summary_v1"
     assert payload["full_graph"]["node_count"] >= 1
-    assert payload["score_source"] == "local_policy"
 
 
 @pytest.mark.anyio
-async def test_call_tool_resolve_accepts_query_alias() -> None:
+async def test_call_tool_resolve_accepts_query_alias(tmp_path: Path) -> None:
     _activate_graph_with_symbols()
+    await _install_test_policy(tmp_path)
 
     response = await call_tool("resolve", {"query": "expand_node"})
     payload = json.loads(response[0].text)
@@ -128,8 +214,11 @@ async def test_call_tool_resolve_accepts_query_alias() -> None:
 
 
 @pytest.mark.anyio
-async def test_call_tool_resolve_and_expand_accepts_query_and_default_depth() -> None:
+async def test_call_tool_resolve_and_expand_accepts_query_and_default_depth(
+    tmp_path: Path,
+) -> None:
     _activate_graph_with_symbols()
+    await _install_test_policy(tmp_path)
 
     response = await call_tool("resolve_and_expand", {"query": "expand_node"})
     payload = json.loads(response[0].text)
@@ -137,24 +226,28 @@ async def test_call_tool_resolve_and_expand_accepts_query_and_default_depth() ->
     assert payload["graph"]["metadata"]["expanded_from"] == "A"
     assert payload["graph"]["metadata"]["depth"] == 1
     assert payload["graph"]["nodes"]
+    assert payload["anchor_decision"]["status"] == "resolved"
 
 
 @pytest.mark.anyio
-async def test_call_tool_resolve_and_expand() -> None:
+async def test_call_tool_resolve_and_expand(tmp_path: Path) -> None:
     _activate_graph_with_symbols()
+    await _install_test_policy(tmp_path)
 
     response = await call_tool("resolve_and_expand", {"symbol": "expand_node", "depth": 1})
     payload = json.loads(response[0].text)
 
     assert payload["graph"]["metadata"]["expanded_from"] == "A"
     assert payload["graph"]["nodes"]
+    assert payload["anchor_decision"]["status"] == "resolved"
     assert payload["full_graph"]["format"] == "summary_v1"
     assert payload["full_graph"]["node_count"] >= 1
-    assert payload["score_source"] == "local_policy"
 
 
 @pytest.mark.anyio
-async def test_call_tool_resolve_ambiguous_returns_null_node_and_candidates() -> None:
+async def test_call_tool_resolve_ambiguous_returns_null_node_and_candidates(
+    tmp_path: Path,
+) -> None:
     graph = build_graph(
         {
             "nodes": [
@@ -168,18 +261,22 @@ async def test_call_tool_resolve_ambiguous_returns_null_node_and_candidates() ->
     graph.nodes["B"]["symbol"] = "fetch_user_info"
     signature = _repo_signature(Path.cwd())
     _set_active_graph(graph, repo_root=Path.cwd().resolve(), signature=signature)
+    await _install_test_policy(tmp_path)
 
     response = await call_tool("resolve", {"query": "fetch_user"})
     payload = json.loads(response[0].text)
 
     assert payload["node"] is None
+    assert payload["anchor_decision"]["status"] == "ambiguous"
     assert len(payload["candidates"]) == 2
     assert payload["query"] == "fetch_user"
     assert "candidates" not in (payload["node"] or {})
 
 
 @pytest.mark.anyio
-async def test_call_tool_resolve_and_expand_ambiguous_returns_candidates() -> None:
+async def test_call_tool_resolve_and_expand_ambiguous_returns_candidates(
+    tmp_path: Path,
+) -> None:
     graph = build_graph(
         {
             "nodes": [
@@ -193,11 +290,13 @@ async def test_call_tool_resolve_and_expand_ambiguous_returns_candidates() -> No
     graph.nodes["B"]["symbol"] = "fetch_user_info"
     signature = _repo_signature(Path.cwd())
     _set_active_graph(graph, repo_root=Path.cwd().resolve(), signature=signature)
+    await _install_test_policy(tmp_path)
 
     response = await call_tool("resolve_and_expand", {"query": "fetch_user", "depth": 1})
     payload = json.loads(response[0].text)
 
     assert payload["node"] is None
+    assert payload["anchor_decision"]["status"] == "ambiguous"
     assert len(payload["candidates"]) == 2
     assert payload["query"] == "fetch_user"
     assert payload["graph"]["nodes"] == []
@@ -205,7 +304,7 @@ async def test_call_tool_resolve_and_expand_ambiguous_returns_candidates() -> No
 
 
 @pytest.mark.anyio
-async def test_call_tool_resolve_below_threshold_returns_top_candidates() -> None:
+async def test_call_tool_resolve_below_threshold_returns_top_candidates(tmp_path: Path) -> None:
     graph = build_graph(
         {
             "nodes": [
@@ -219,11 +318,13 @@ async def test_call_tool_resolve_below_threshold_returns_top_candidates() -> Non
     graph.nodes["B"]["symbol"] = "other_symbol"
     signature = _repo_signature(Path.cwd())
     _set_active_graph(graph, repo_root=Path.cwd().resolve(), signature=signature)
+    await _install_test_policy(tmp_path)
 
     response = await call_tool("resolve", {"query": "zzz_no_match"})
     payload = json.loads(response[0].text)
 
     assert payload["node"] is None
+    assert payload["anchor_decision"]["status"] == "not_found"
     assert len(payload["candidates"]) >= 1
     assert payload["query"] == "zzz_no_match"
 
@@ -237,139 +338,183 @@ async def test_call_tool_unknown_returns_error() -> None:
 
     assert "error" in payload
     assert "unknown" in payload["error"].lower()
-    assert payload["score_source"] == "local_policy"
-
-
-@pytest.mark.anyio
-async def test_runtime_uses_injected_score_fn(monkeypatch: pytest.MonkeyPatch) -> None:
-    _activate_graph_with_symbols()
-    score_calls: list[str] = []
-
-    def score_fn(node: GraphNode, graph: Graph, step: int) -> float:
-        score_calls.append(node.id)
-        return 1.0
-
-    # If the injected scorer is used, the local policy should never be consulted.
-    def fail_local_policy() -> None:  # pragma: no cover - defensive guard
-        raise AssertionError("local policy should not be loaded when score_fn is injected")
-
-    monkeypatch.setattr(server, "load_local_policy", fail_local_policy)
-
-    runtime = IterativeContextToolRuntime(score_fn=score_fn)
-    response = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
-    payload = json.loads(response[0].text)
-
-    assert score_calls
-    assert payload["graph"]["metadata"]["expanded_from"] == "A"
-    assert payload["score_source"] == "injected"
-
-
-@pytest.mark.anyio
-async def test_runtime_uses_local_policy_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
-    _activate_graph_with_symbols()
-    score_calls: list[str] = []
-
-    def local_score(node: GraphNode, graph: Graph, step: int) -> float:
-        score_calls.append(node.id)
-        return 2.0
-
-    monkeypatch.setattr(server, "load_local_policy", lambda: local_score)
-
-    runtime = IterativeContextToolRuntime()
-    response = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
-    payload = json.loads(response[0].text)
-
-    assert score_calls
-    assert payload["score_source"] == "local_policy"
-
-
-@pytest.mark.anyio
-async def test_runtime_falls_back_to_default_when_policy_missing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _activate_graph_with_symbols()
-    score_calls: list[str] = []
-
-    def default_score(node: GraphNode, graph: Graph, step: int) -> float:
-        score_calls.append(node.id)
-        return 3.0
-
-    monkeypatch.setattr(server, "load_local_policy", lambda: None)
-    monkeypatch.setattr(server, "default_score_fn", default_score)
-
-    runtime = IterativeContextToolRuntime()
-    response = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
-    payload = json.loads(response[0].text)
-
-    assert score_calls
-    assert payload["score_source"] == "default"
-
-
-def _write_policy(root: Path, *, score_value: float = 7.0) -> Path:
-    path = root / "policy.py"
-    path.write_text(
-        (
-            "def score_fn(node, graph, step):\n"
-            f"    return {score_value}\n"
-        ),
-        encoding="utf-8",
-    )
-    return path
 
 
 @pytest.mark.anyio
 async def test_runtime_requires_install_before_evaluator_tools(tmp_path: Path) -> None:
     _activate_graph_with_symbols()
-    runtime = IterativeContextToolRuntime(require_score_install=True)
+    runtime = IterativeContextToolRuntime()
 
-    blocked = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
-    blocked_payload = json.loads(blocked[0].text)
-    assert "error" in blocked_payload
-    assert "score install required" in blocked_payload["error"]
+    for tool_name, arguments in (
+        ("resolve", {"symbol": "expand_node"}),
+        ("expand", {"node_id": "A", "depth": 1}),
+        ("resolve_and_expand", {"symbol": "expand_node", "depth": 1}),
+    ):
+        blocked = await runtime.call_tool(tool_name, arguments)
+        blocked_payload = json.loads(blocked[0].text)
+        assert "error" in blocked_payload
+        assert blocked_payload["error_code"] == "policy_install_required"
+        assert "policy install required" in blocked_payload["error"]
 
-    policy_path = _write_policy(tmp_path, score_value=11.0)
-    installed = await runtime.call_tool(
-        "install_score",
-        {"policy_path": str(policy_path), "policy_id": "policy-v1"},
-    )
-    install_payload = json.loads(installed[0].text)
-
-    assert install_payload["ok"] is True
-    assert install_payload["policy_id"] == "policy-v1"
-    assert install_payload["score_source"] == "installed"
+    await _install_test_policy(tmp_path, runtime=runtime, score_value=11.0)
 
     expanded = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
     expanded_payload = json.loads(expanded[0].text)
-    assert expanded_payload["score_source"] == "installed"
-    assert expanded_payload["active_score_id"] == "policy-v1"
+    assert expanded_payload["active_policy_id"] == "policy-v1"
     assert expanded_payload["graph"]["metadata"]["expanded_from"] == "A"
 
 
 @pytest.mark.anyio
-async def test_runtime_verify_score_reports_missing_and_mismatch(tmp_path: Path) -> None:
+async def test_runtime_verify_policy_reports_missing_and_mismatch(tmp_path: Path) -> None:
     runtime = IterativeContextToolRuntime()
 
-    missing = await runtime.call_tool("verify_score", {"policy_id": "policy-v1"})
+    missing = await runtime.call_tool("verify_policy", {"policy_id": "policy-v1"})
     missing_payload = json.loads(missing[0].text)
     assert "error" in missing_payload
-    assert "no score installed" in missing_payload["error"]
+    assert missing_payload["error_code"] == "no_active_policy"
+    assert "no policy installed" in missing_payload["error"]
 
     policy_path = _write_policy(tmp_path, score_value=5.0)
     await runtime.call_tool(
-        "install_score",
+        "install_policy",
         {"policy_path": str(policy_path), "policy_id": "policy-v1"},
     )
 
-    mismatch = await runtime.call_tool("verify_score", {"policy_id": "policy-v2"})
+    mismatch = await runtime.call_tool("verify_policy", {"policy_id": "policy-v2"})
     mismatch_payload = json.loads(mismatch[0].text)
     assert "error" in mismatch_payload
+    assert mismatch_payload["error_code"] == "policy_mismatch"
     assert "expected policy-v2, got policy-v1" in mismatch_payload["error"]
 
-    verified = await runtime.call_tool("verify_score", {"policy_id": "policy-v1"})
+    verified = await runtime.call_tool("verify_policy", {"policy_id": "policy-v1"})
     verified_payload = json.loads(verified[0].text)
     assert verified_payload["ok"] is True
     assert verified_payload["policy_id"] == "policy-v1"
-    assert verified_payload["score_source"] == "installed"
+    assert verified_payload["policy_source"] == "installed"
+
+
+@pytest.mark.anyio
+async def test_runtime_describe_policy_returns_active_metadata(tmp_path: Path) -> None:
+    runtime = IterativeContextToolRuntime()
+    policy_path = _write_policy(tmp_path, score_value=4.0)
+    await runtime.call_tool(
+        "install_policy",
+        {"policy_path": str(policy_path), "policy_id": "policy-v1"},
+    )
+
+    described = await runtime.call_tool("describe_policy", {})
+    payload = json.loads(described[0].text)
+
+    assert payload["ok"] is True
+    assert payload["active"] is True
+    assert payload["policy_id"] == "policy-v1"
+    assert payload["has_lookahead_policy"] is True
+
+
+@pytest.mark.anyio
+async def test_install_policy_typed_failure_for_bad_symbol(tmp_path: Path) -> None:
+    path = tmp_path / "bad_policy.py"
+    path.write_text(
+        (
+            "resolve_policy = 123\n"
+            "def lookahead_policy(node, graph, step):\n"
+            "    return 0.0\n"
+        ),
+        encoding="utf-8",
+    )
+    runtime = IterativeContextToolRuntime()
+
+    result = await runtime.call_tool(
+        "install_policy",
+        {
+            "policy_path": str(path),
+            "policy_id": "policy-v1",
+            "resolve_policy_symbol": "resolve_policy",
+        },
+    )
+    payload = json.loads(result[0].text)
+
+    assert payload["error_code"] == "policy_load_error"
+    assert "non-callable resolve_policy" in payload["error"]
+
+
+@pytest.mark.anyio
+async def test_resolve_and_expand_uses_installed_resolve_and_traversal_policy(
+    tmp_path: Path,
+) -> None:
+    _activate_graph_with_symbols()
+    policy_path = tmp_path / "policy.py"
+    policy_path.write_text(
+        (
+            "SEEN = []\n"
+            "def resolve_policy(query, candidates, state):\n"
+            "    total = state.candidate_counts.total\n"
+            "    SEEN.append((query, [c.node_id for c in candidates], total))\n"
+            "    chosen = candidates[0]\n"
+            "    return {\n"
+            "        'status': 'resolved',\n"
+            "        'query_label': query,\n"
+            "        'candidates': candidates,\n"
+            "        'selected_anchor_id': chosen.node_id,\n"
+            "        'reason': 'custom_resolve',\n"
+            "        'shallow_expand': False,\n"
+            "    }\n"
+            "def lookahead_policy(node, graph, step):\n"
+            "    assert isinstance(step, int)\n"
+            "    if node.id == 'B':\n"
+            "        return 9.0\n"
+            "    return 1.0\n"
+        ),
+        encoding="utf-8",
+    )
+    runtime = IterativeContextToolRuntime()
+    await runtime.call_tool(
+        "install_policy",
+        {"policy_path": str(policy_path), "policy_id": "policy-v1"},
+    )
+
+    response = await runtime.call_tool(
+        "resolve_and_expand",
+        {"symbol": "expand_node", "depth": 2},
+    )
+    payload = json.loads(response[0].text)
+
+    assert payload["anchor_decision"]["reason"] == "custom_resolve"
+    assert payload["graph"]["metadata"]["expanded_from"] == "A"
+    assert payload["graph"]["nodes"]
+
+
+@pytest.mark.anyio
+async def test_install_policy_requires_resolve_and_lookahead_callables(
+    tmp_path: Path,
+) -> None:
+    runtime = IterativeContextToolRuntime()
+    policy_path = tmp_path / "resolve_only_policy.py"
+    policy_path.write_text(
+        (
+            "def resolve_policy(query, candidates, state):\n"
+            "    return {\n"
+            "        'status': 'not_found',\n"
+            "        'query_label': query,\n"
+            "        'candidates': [],\n"
+            "        'selected_anchor_id': None,\n"
+            "        'reason': 'stub',\n"
+            "    }\n"
+        ),
+        encoding="utf-8",
+    )
+
+    installed = await runtime.call_tool(
+        "install_policy",
+        {"policy_path": str(policy_path), "policy_id": "policy-v1"},
+    )
+    install_payload = json.loads(installed[0].text)
+    assert install_payload["error_code"] == "policy_load_error"
+    assert "does not define callable lookahead_policy" in install_payload["error"]
+
+    resolved = await runtime.call_tool("resolve", {"symbol": "expand_node"})
+    resolved_payload = json.loads(resolved[0].text)
+    assert resolved_payload["error_code"] == "policy_install_required"
 
 
 def _write_repo(root: Path, symbol: str) -> Path:
@@ -401,9 +546,10 @@ def test_explicit_repo_load_without_chdir(two_repos: tuple[Path, Path]) -> None:
 
 
 @pytest.mark.anyio
-async def test_runtime_binds_to_repo_root(two_repos: tuple[Path, Path]) -> None:
+async def test_runtime_binds_to_repo_root(two_repos: tuple[Path, Path], tmp_path: Path) -> None:
     repo_a, _ = two_repos
     runtime = IterativeContextToolRuntime(repo_root=repo_a)
+    await _install_test_policy(tmp_path, runtime=runtime)
 
     response = await runtime.call_tool("resolve", {"symbol": "alpha_symbol"})
     payload = json.loads(response[0].text)
@@ -416,10 +562,12 @@ async def test_runtime_binds_to_repo_root(two_repos: tuple[Path, Path]) -> None:
 
 
 @pytest.mark.anyio
-async def test_runtimes_isolate_repos(two_repos: tuple[Path, Path]) -> None:
+async def test_runtimes_isolate_repos(two_repos: tuple[Path, Path], tmp_path: Path) -> None:
     repo_a, repo_b = two_repos
     runtime_a = IterativeContextToolRuntime(repo_root=repo_a)
     runtime_b = IterativeContextToolRuntime(repo_root=repo_b)
+    await _install_test_policy(tmp_path / "policy_a", runtime=runtime_a, policy_id="policy-a")
+    await _install_test_policy(tmp_path / "policy_b", runtime=runtime_b, policy_id="policy-b")
 
     first = await runtime_a.call_tool("resolve", {"symbol": "alpha_symbol"})
     first_payload = json.loads(first[0].text)
@@ -445,12 +593,13 @@ async def test_runtimes_isolate_repos(two_repos: tuple[Path, Path]) -> None:
 
 @pytest.mark.anyio
 async def test_runtime_defaults_to_cwd(
-    two_repos: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+    two_repos: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repo_a, _ = two_repos
     monkeypatch.chdir(repo_a)
 
     runtime = IterativeContextToolRuntime()
+    await _install_test_policy(tmp_path, runtime=runtime)
     response = await runtime.call_tool("resolve", {"symbol": "alpha_symbol"})
     payload = json.loads(response[0].text)
 

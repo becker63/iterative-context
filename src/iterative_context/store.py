@@ -3,6 +3,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
+from iterative_context.anchor_policy import AnchorCandidate, anchor_candidate_to_dict
 from iterative_context.fuzzy_rank import pick_unique_or_ambiguous, rank_symbol_candidates
 from iterative_context.graph_models import Graph, GraphEdge, GraphNode
 
@@ -120,6 +121,65 @@ class GraphStore:
 
         return None
 
+    def collect_anchor_candidates(self, query: str, *, limit: int = 8) -> list[AnchorCandidate]:
+        """Collect deterministic anchor evidence for policy-controlled resolution."""
+        q = (query or "").strip()
+        if not q:
+            return []
+
+        out: list[AnchorCandidate] = []
+        seen: set[str] = set()
+
+        exact_ids = sorted(self.index_by_symbol.get(q, []))
+        for rank, node_id in enumerate(exact_ids, start=1):
+            candidate = self._candidate_for_id(
+                node_id,
+                label=q,
+                score=100.0,
+                rank=rank,
+                reason="exact_symbol_match",
+                metadata={"match_source": "exact_symbol"},
+            )
+            if candidate is not None and candidate.node_id not in seen:
+                out.append(candidate)
+                seen.add(candidate.node_id)
+
+        symbols = self._symbol_index()
+        for rank, ranked in enumerate(rank_symbol_candidates(q, symbols), start=1):
+            metadata: dict[str, object] = {"match_source": "fuzzy_symbol", "symbol": ranked.symbol}
+            candidate = self._candidate_for_id(
+                ranked.node_id,
+                label=ranked.symbol,
+                score=ranked.score,
+                rank=rank,
+                reason=ranked.reason,
+                metadata=metadata,
+            )
+            if candidate is not None and candidate.node_id not in seen:
+                out.append(candidate)
+                seen.add(candidate.node_id)
+
+        lowered = q.lower()
+        file_rank = 1
+        for path, ids in sorted(self.index_by_file.items(), key=lambda item: item[0]):
+            if lowered not in path.lower():
+                continue
+            for node_id in sorted(ids):
+                candidate = self._candidate_for_id(
+                    node_id,
+                    label=path,
+                    score=None,
+                    rank=file_rank,
+                    reason="file_substring_match",
+                    metadata={"match_source": "file_substring", "file": path},
+                )
+                if candidate is not None and candidate.node_id not in seen:
+                    out.append(candidate)
+                    seen.add(candidate.node_id)
+                    file_rank += 1
+
+        return out[:limit]
+
     def _symbol_index(self) -> list[tuple[str, str]]:
         symbols: list[tuple[str, str]] = []
         for sym, ids in self.index_by_symbol.items():
@@ -127,26 +187,52 @@ class GraphStore:
                 symbols.append((sorted(ids)[0], sym))
         return symbols
 
+    def _candidate_for_id(  # noqa: PLR0913
+        self,
+        node_id: str,
+        *,
+        label: str | None,
+        score: float | None,
+        rank: int | None,
+        reason: str | None,
+        metadata: dict[str, object] | None,
+    ) -> AnchorCandidate | None:
+        node = self._node_for_id(node_id)
+        if node is None:
+            return None
+        node_data = self.nodes_by_id.get(node_id, {})
+        symbol_value = node_data.get("symbol")
+        file_value = node_data.get("file")
+        merged_metadata = dict(metadata or {})
+        if isinstance(symbol_value, str):
+            merged_metadata.setdefault("symbol", symbol_value)
+        if isinstance(file_value, str):
+            merged_metadata.setdefault("file", file_value)
+        return AnchorCandidate(
+            node_id=node.id,
+            label=label or (symbol_value if isinstance(symbol_value, str) else None),
+            kind=node.kind,
+            score=score,
+            rank=rank,
+            reason=reason,
+            metadata=merged_metadata or None,
+        )
+
     def resolve_candidates(self, query: str, *, limit: int = 8) -> list[dict[str, object]]:
         """Return ranked candidates for ambiguous or below-threshold resolve."""
-        symbols = self._symbol_index()
-        _winner, ambiguous = pick_unique_or_ambiguous(query, symbols)
-        if ambiguous:
-            ranked = ambiguous
-        elif _winner is not None:
+        resolved = self.resolve(query)
+        if resolved is not None:
             return []
-        else:
-            ranked = rank_symbol_candidates(query, symbols)[:limit]
+        candidates = self.collect_anchor_candidates(query, limit=limit)
         out: list[dict[str, object]] = []
-        for c in ranked:
-            out.append(
-                {
-                    "node_id": c.node_id,
-                    "symbol": c.symbol,
-                    "score": c.score,
-                    "reason": c.reason,
-                }
+        for candidate in candidates:
+            payload = anchor_candidate_to_dict(candidate)
+            symbol_value = (
+                candidate.metadata.get("symbol") if candidate.metadata is not None else None
             )
+            if isinstance(symbol_value, str):
+                payload["symbol"] = symbol_value
+            out.append(payload)
         return out
 
     def get_neighbors(self, node_id: str, kinds: list[str] | None = None) -> list[str]:

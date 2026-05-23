@@ -1,28 +1,82 @@
 from __future__ import annotations
 
-import importlib
+import hashlib
 import importlib.util
+import inspect
 import json
 import math
+from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 from typing import Any, cast
 
 from mcp.server import Server
 from mcp.types import TextContent, Tool
 
 from iterative_context import exploration
-from iterative_context.scoring import default_score_fn
-from iterative_context.serialization import serialize_graph_summary, serialize_node
+from iterative_context.anchor_policy import (
+    POLICY_INTERFACE_VERSION,
+    AnchorCandidate,
+    AnchorDecision,
+    ResolveCandidateCounts,
+    ResolvePolicyState,
+    anchor_candidate_to_dict,
+    anchor_decision_from_value,
+    anchor_decision_to_dict,
+)
 from iterative_context.graph_models import GraphNode
-from iterative_context.types import SelectionCallable
+from iterative_context.serialization import serialize_graph_summary, serialize_node
+from iterative_context.types import (
+    LookaheadPolicyCallable,
+    ResolvePolicyCallable,
+)
 
 server = Server("iterative-context")
 
 _DEPTH_FLOAT_TOLERANCE = 1e-9
 
 
+class ToolPayloadError(Exception):
+    def __init__(self, code: str, message: str, **payload: object):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.payload = payload
+
+    def as_payload(self) -> dict[str, object]:
+        out: dict[str, object] = {"error": self.message, "error_code": self.code}
+        out.update(self.payload)
+        return out
+
+
+@dataclass
+class InstalledPolicy:
+    policy_id: str
+    policy_path: Path
+    policy_sha: str
+    interface_version: str
+    resolve_policy_symbol: str | None
+    lookahead_policy_symbol: str | None
+    resolve_policy: ResolvePolicyCallable | None
+    lookahead_policy: LookaheadPolicyCallable | None
+    install_mode: str
+
+    def to_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "policy_id": self.policy_id,
+            "policy_path": str(self.policy_path),
+            "policy_sha": self.policy_sha,
+            "interface_version": self.interface_version,
+            "install_mode": self.install_mode,
+            "resolve_policy_symbol": self.resolve_policy_symbol,
+            "lookahead_policy_symbol": self.lookahead_policy_symbol,
+        }
+        payload["has_resolve_policy"] = self.resolve_policy is not None
+        payload["has_lookahead_policy"] = self.lookahead_policy is not None
+        return payload
+
+
 def _serialize_resolved_node(node: GraphNode) -> dict[str, Any]:
-    """Serialize a resolved graph node with any graph extras."""
     graph = exploration.get_active_graph()
     extras: dict[str, Any] = {}
     if graph is not None and node.id in graph.nodes:
@@ -31,55 +85,27 @@ def _serialize_resolved_node(node: GraphNode) -> dict[str, Any]:
     return serialize_node(node, extras)
 
 
-def _resolve_lookup(symbol: str) -> tuple[dict[str, Any] | None, list[dict[str, object]] | None]:
-    """
-    Resolve a symbol to a node and/or ranked candidates.
+def _serialize_candidate(candidate: AnchorCandidate) -> dict[str, object]:
+    payload = anchor_candidate_to_dict(candidate)
+    metadata = candidate.metadata or {}
+    symbol_value = metadata.get("symbol")
+    if isinstance(symbol_value, str):
+        payload["symbol"] = symbol_value
+    file_value = metadata.get("file")
+    if isinstance(file_value, str):
+        payload["file"] = file_value
+    return payload
 
-    Returns (node, candidates). On unique match, node is set and candidates is None.
-    On ambiguity or below-threshold miss, node is None and candidates lists top matches.
-    """
-    node = exploration.resolve(symbol)
-    if node is not None:
-        return _serialize_resolved_node(node), None
 
-    store = exploration.get_active_store()
-    if store is None:
-        return None, None
-
-    candidates = store.resolve_candidates(symbol)
-    if candidates:
-        return None, candidates
-    return None, None
+def _serialize_candidates(candidates: list[AnchorCandidate]) -> list[dict[str, object]]:
+    return [_serialize_candidate(candidate) for candidate in candidates]
 
 
 def _empty_expansion_graph() -> dict[str, Any]:
     return {"nodes": [], "edges": [], "metadata": {}}
 
 
-def _resolve_tool_payload(
-    symbol: str,
-    *,
-    score_source: str,
-    active_score_id: str | None,
-    include_graph: bool = False,
-) -> dict[str, Any]:
-    node, candidates = _resolve_lookup(symbol)
-    payload: dict[str, Any] = {
-        "node": node,
-        "full_graph": _serialize_active_graph(),
-        "score_source": score_source,
-        "active_score_id": active_score_id,
-    }
-    if include_graph:
-        payload["graph"] = _empty_expansion_graph()
-    if candidates is not None:
-        payload["candidates"] = candidates
-        payload["query"] = symbol
-    return payload
-
-
 def _serialize_active_graph() -> dict[str, Any]:
-    """Return a compact digest of the active graph (not full node/edge lists)."""
     graph = exploration.get_active_graph()
     metadata: dict[str, Any] = {"source": "active_graph"}
     metadata.update(exploration.get_active_repo_metadata())
@@ -157,8 +183,8 @@ def _tool_definitions() -> list[Tool]:
 def _admin_tool_definitions() -> list[Tool]:
     return [
         Tool(
-            name="install_score",
-            description="Install a score or selection policy for this runtime session.",
+            name="install_policy",
+            description="Install a behavior policy for this runtime session.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -170,11 +196,25 @@ def _admin_tool_definitions() -> list[Tool]:
                         "type": "string",
                         "description": "Deterministic policy identity chosen by the harness.",
                     },
-                    "symbol": {
+                    "interface_version": {
                         "type": "string",
                         "description": (
-                            "Callable symbol to load from the module. "
-                            "Defaults to score_fn."
+                            "Policy contract version. Defaults to "
+                            "iterative_context.behavior_policy.v1."
+                        ),
+                    },
+                    "resolve_policy_symbol": {
+                        "type": "string",
+                        "description": (
+                            "Optional behavior symbol for fuzzy anchor decisions. "
+                            "Defaults to resolve_policy."
+                        ),
+                    },
+                    "lookahead_policy_symbol": {
+                        "type": "string",
+                        "description": (
+                            "Optional behavior symbol for graph traversal lookahead. "
+                            "Defaults to lookahead_policy."
                         ),
                     },
                 },
@@ -182,18 +222,34 @@ def _admin_tool_definitions() -> list[Tool]:
             },
         ),
         Tool(
-            name="verify_score",
-            description="Verify the active session-bound score or selection policy identity.",
+            name="verify_policy",
+            description="Verify the active session-bound behavior policy identity.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "policy_id": {
                         "type": "string",
                         "description": "Expected deterministic policy identity.",
-                    }
+                    },
+                    "policy_sha": {
+                        "type": "string",
+                        "description": (
+                            "Expected policy SHA256 when the harness wants stronger "
+                            "identity verification."
+                        ),
+                    },
+                    "interface_version": {
+                        "type": "string",
+                        "description": "Expected policy interface version.",
+                    },
                 },
                 "required": ["policy_id"],
             },
+        ),
+        Tool(
+            name="describe_policy",
+            description="Describe the currently active policy metadata.",
+            inputSchema={"type": "object", "properties": {}, "required": []},
         ),
     ]
 
@@ -203,20 +259,11 @@ def _as_text_content(payload: dict[str, Any]) -> TextContent:
 
 
 class IterativeContextToolRuntime:
-    """In-process MCP-compatible runtime with optional scoring injection."""
+    """In-process MCP-compatible runtime for the IC MCP surface."""
 
-    def __init__(
-        self,
-        score_fn: SelectionCallable | None = None,
-        repo_root: str | Path | None = None,
-        require_score_install: bool = False,
-    ):
-        self._score_fn = score_fn
+    def __init__(self, repo_root: str | Path | None = None):
         self._repo_root = Path(repo_root).resolve() if repo_root is not None else None
-        self._require_score_install = require_score_install
-        self._installed_score_fn: SelectionCallable | None = None
-        self._active_score_id: str | None = None
-        self._active_score_path: Path | None = None
+        self._installed_policy: InstalledPolicy | None = None
 
     async def list_tools(self) -> list[Tool]:
         return _tool_definitions()
@@ -228,150 +275,349 @@ class IterativeContextToolRuntime:
         try:
             result = self._dispatch(name, arguments or {})
             return [_as_text_content(result)]
+        except ToolPayloadError as exc:
+            return [_as_text_content(exc.as_payload())]
         except Exception as exc:  # pragma: no cover - defensive guard
             return [_as_text_content({"error": str(exc)})]
 
-    def _dispatch(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    def _dispatch(  # noqa: PLR0911
+        self, name: str, arguments: dict[str, Any]
+    ) -> dict[str, Any]:
         tool_name = name.strip()
-        if tool_name == "install_score":
-            return self._install_score(arguments)
-        if tool_name == "verify_score":
-            return self._verify_score(arguments)
+        if tool_name == "install_policy":
+            return self._install_policy(arguments)
+        if tool_name == "verify_policy":
+            return self._verify_policy(arguments)
+        if tool_name == "describe_policy":
+            return self._describe_policy()
 
-        score_fn, score_source, active_score_id = self._resolve_effective_score_fn()
         if tool_name == "resolve":
-            symbol = _take_anchor_symbol(arguments)
-            self._ensure_graph_ready()
-            return _resolve_tool_payload(
-                symbol,
-                score_source=score_source,
-                active_score_id=active_score_id,
-            )
+            self._ensure_policy_ready_for_evaluator()
+            return self._resolve_tool(arguments)
 
         if tool_name == "expand":
+            self._ensure_policy_ready_for_evaluator()
+            lookahead_policy = self._resolve_effective_lookahead_policy()
             node_id = _require_str(arguments, "node_id")
             depth = _require_int(arguments, "depth")
             self._ensure_graph_ready()
-            graph = exploration.expand(node_id=node_id, depth=depth, score_fn=score_fn)
+            graph = exploration.expand(node_id=node_id, depth=depth, score_fn=lookahead_policy)
             return {
                 "graph": graph,
                 "full_graph": _serialize_active_graph(),
-                "score_source": score_source,
-                "active_score_id": active_score_id,
+                **self._policy_payload_fields(),
             }
 
         if tool_name == "resolve_and_expand":
-            return self._resolve_and_expand(arguments, score_fn, score_source, active_score_id)
+            self._ensure_policy_ready_for_evaluator()
+            lookahead_policy = self._resolve_effective_lookahead_policy()
+            return self._resolve_and_expand(arguments, lookahead_policy)
 
-        return {"error": f"Unknown tool: {name}", "score_source": score_source}
+        return {"error": f"Unknown tool: {name}"}
 
     def _ensure_graph_ready(self) -> None:
         exploration.ensure_graph_loaded(repo_root=self._repo_root)
 
-    def clear_score_install(self) -> None:
-        self._installed_score_fn = None
-        self._active_score_id = None
-        self._active_score_path = None
-
-    def _install_score(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        policy_path = Path(_require_str(arguments, "policy_path")).expanduser().resolve()
-        policy_id = _require_str(arguments, "policy_id").strip()
-        if not policy_id:
-            raise ValueError("policy_id must be a non-empty string")
-
-        raw_symbol = arguments.get("symbol", "score_fn")
-        if not isinstance(raw_symbol, str) or not raw_symbol.strip():
-            raise ValueError("symbol must be a non-empty string")
-        symbol = raw_symbol.strip()
-
-        score_fn = load_policy_callable(policy_path, symbol)
-        self._installed_score_fn = score_fn
-        self._active_score_id = policy_id
-        self._active_score_path = policy_path
-        return {
-            "ok": True,
-            "policy_id": policy_id,
-            "policy_path": str(policy_path),
-            "symbol": symbol,
-            "score_source": "installed",
-        }
-
-    def _verify_score(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        expected_policy_id = _require_str(arguments, "policy_id").strip()
-        if not expected_policy_id:
-            raise ValueError("policy_id must be a non-empty string")
-
-        if self._active_score_id is None:
-            raise RuntimeError("no score installed for this runtime session")
-        if self._active_score_id != expected_policy_id:
-            raise RuntimeError(
-                f"active score mismatch: expected {expected_policy_id}, got {self._active_score_id}"
+    def _ensure_policy_ready_for_evaluator(self) -> None:
+        if self._installed_policy is None:
+            raise ToolPayloadError(
+                "policy_install_required",
+                "policy install required before evaluator tools can run",
             )
 
-        payload: dict[str, Any] = {
-            "ok": True,
-            "policy_id": self._active_score_id,
-            "score_source": "installed",
+    def clear_policy_install(self) -> None:
+        self._installed_policy = None
+
+    def _policy_payload_fields(self) -> dict[str, object]:
+        if self._installed_policy is None:
+            return {
+                "active_policy_id": None,
+                "policy_interface_version": POLICY_INTERFACE_VERSION,
+            }
+        return {
+            "active_policy_id": self._installed_policy.policy_id,
+            "policy_interface_version": self._installed_policy.interface_version,
+            "policy_path": str(self._installed_policy.policy_path),
+            "policy_sha": self._installed_policy.policy_sha,
         }
-        if self._active_score_path is not None:
-            payload["policy_path"] = str(self._active_score_path)
+
+    def _install_policy(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        policy_path = Path(_require_str(arguments, "policy_path")).expanduser().resolve()
+        policy_id = _require_non_empty_str(arguments, "policy_id")
+        interface_version = (
+            _optional_str(arguments, "interface_version") or POLICY_INTERFACE_VERSION
+        )
+        resolve_policy_symbol = _optional_str(
+            arguments, "resolve_policy_symbol", default="resolve_policy"
+        )
+        lookahead_policy_symbol = _optional_str(
+            arguments, "lookahead_policy_symbol", default="lookahead_policy"
+        )
+
+        try:
+            module = _load_policy_module(policy_path)
+            resolve_policy = _load_required_behavior_callable(
+                module, policy_path, resolve_policy_symbol
+            )
+            lookahead_policy = _load_required_selection_callable(
+                module, policy_path, lookahead_policy_symbol
+            )
+        except FileNotFoundError as exc:
+            raise ToolPayloadError(
+                "policy_load_error",
+                str(exc),
+                policy_path=str(policy_path),
+            ) from exc
+        except (ImportError, ValueError) as exc:
+            raise ToolPayloadError(
+                "policy_load_error",
+                str(exc),
+                policy_path=str(policy_path),
+                policy_id=policy_id,
+            ) from exc
+
+        installed = InstalledPolicy(
+            policy_id=policy_id,
+            policy_path=policy_path,
+            policy_sha=_sha256_file(policy_path),
+            interface_version=interface_version,
+            resolve_policy_symbol=resolve_policy_symbol,
+            lookahead_policy_symbol=lookahead_policy_symbol,
+            resolve_policy=resolve_policy,
+            lookahead_policy=lookahead_policy,
+            install_mode="policy",
+        )
+        self._installed_policy = installed
+        return {
+            "ok": True,
+            **installed.to_payload(),
+            "policy_source": "installed",
+        }
+
+    def _verify_policy(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        expected_policy_id = _require_non_empty_str(arguments, "policy_id")
+        expected_policy_sha = _optional_str(arguments, "policy_sha")
+        expected_interface_version = _optional_str(arguments, "interface_version")
+
+        if self._installed_policy is None:
+            raise ToolPayloadError(
+                "no_active_policy",
+                "no policy installed for this runtime session",
+                expected_policy_id=expected_policy_id,
+            )
+        if self._installed_policy.policy_id != expected_policy_id:
+            raise ToolPayloadError(
+                "policy_mismatch",
+                (
+                    "active policy mismatch: expected "
+                    f"{expected_policy_id}, got {self._installed_policy.policy_id}"
+                ),
+                expected_policy_id=expected_policy_id,
+                active_policy_id=self._installed_policy.policy_id,
+            )
+        if (
+            expected_policy_sha is not None
+            and self._installed_policy.policy_sha != expected_policy_sha
+        ):
+            raise ToolPayloadError(
+                "policy_mismatch",
+                (
+                    "active policy sha mismatch: expected "
+                    f"{expected_policy_sha}, got {self._installed_policy.policy_sha}"
+                ),
+                expected_policy_sha=expected_policy_sha,
+                active_policy_sha=self._installed_policy.policy_sha,
+            )
+        if (
+            expected_interface_version is not None
+            and self._installed_policy.interface_version != expected_interface_version
+        ):
+            raise ToolPayloadError(
+                "policy_mismatch",
+                (
+                    "active policy interface_version mismatch: expected "
+                    f"{expected_interface_version}, got {self._installed_policy.interface_version}"
+                ),
+                expected_interface_version=expected_interface_version,
+                active_interface_version=self._installed_policy.interface_version,
+            )
+        return {"ok": True, **self._installed_policy.to_payload(), "policy_source": "installed"}
+
+    def _describe_policy(self) -> dict[str, Any]:
+        if self._installed_policy is None:
+            return {
+                "ok": True,
+                "active": False,
+                "policy_source": None,
+                "policy_interface_version": POLICY_INTERFACE_VERSION,
+            }
+        return {
+            "ok": True,
+            "active": True,
+            "policy_source": "installed",
+            **self._installed_policy.to_payload(),
+        }
+
+    def admin_install_policy(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        return self._install_policy(arguments)
+
+    def admin_verify_policy(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        return self._verify_policy(arguments)
+
+    def admin_describe_policy(self) -> dict[str, Any]:
+        return self._describe_policy()
+
+    def _resolve_effective_lookahead_policy(self) -> LookaheadPolicyCallable:
+        if self._installed_policy is None:
+            raise ToolPayloadError(
+                "policy_install_required",
+                "policy install required before evaluator tools can run",
+            )
+        if self._installed_policy.lookahead_policy is None:
+            raise ToolPayloadError(
+                "policy_load_error",
+                "installed policy does not define a callable lookahead_policy",
+                policy_id=self._installed_policy.policy_id,
+            )
+        return self._installed_policy.lookahead_policy
+
+    def _resolve_tool(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        symbol = _take_anchor_symbol(arguments)
+        self._ensure_graph_ready()
+        decision = self._resolve_anchor_decision(symbol)
+        return self._resolve_payload_from_decision(symbol, decision)
+
+    def _resolve_anchor_decision(self, symbol: str) -> AnchorDecision:
+        self._ensure_graph_ready()
+        store = exploration.get_active_store()
+        candidates = (
+            [] if store is None else store.collect_anchor_candidates(symbol, limit=8)
+        )
+        state = self._resolve_policy_state(symbol, candidates)
+        if self._installed_policy is None or self._installed_policy.resolve_policy is None:
+            raise ToolPayloadError(
+                "policy_load_error",
+                "installed policy does not define a callable resolve_policy",
+                policy_id=self._installed_policy.policy_id if self._installed_policy else None,
+            )
+        raw_decision = self._installed_policy.resolve_policy(symbol, candidates, state)
+        try:
+            return anchor_decision_from_value(
+                raw_decision,
+                query=symbol,
+                fallback_candidates=candidates,
+            )
+        except ValueError as exc:
+            raise ToolPayloadError(
+                "policy_behavior_error",
+                f"resolve_policy returned invalid AnchorDecision: {exc}",
+                policy_id=self._installed_policy.policy_id if self._installed_policy else None,
+            ) from exc
+
+    def _resolve_policy_state(
+        self, query: str, candidates: list[AnchorCandidate]
+    ) -> ResolvePolicyState:
+        exact = 0
+        fuzzy = 0
+        file_matches = 0
+        for candidate in candidates:
+            source = (candidate.metadata or {}).get("match_source")
+            if source == "exact_symbol":
+                exact += 1
+            elif source == "fuzzy_symbol":
+                fuzzy += 1
+            elif source == "file_substring":
+                file_matches += 1
+        return ResolvePolicyState(
+            query_label=query,
+            repo_metadata=exploration.get_active_repo_metadata(),
+            candidate_limit=8,
+            fuzzy_min_score=70.0,
+            fuzzy_gap=5.0,
+            candidate_counts=ResolveCandidateCounts(
+                total=len(candidates),
+                exact_symbol=exact,
+                fuzzy_symbol=fuzzy,
+                file_substring=file_matches,
+            ),
+            active_policy_id=(
+                self._installed_policy.policy_id if self._installed_policy else None
+            ),
+            policy_interface_version=(
+                self._installed_policy.interface_version
+                if self._installed_policy is not None
+                else POLICY_INTERFACE_VERSION
+            ),
+        )
+
+    def _resolve_payload_from_decision(
+        self,
+        symbol: str,
+        decision: AnchorDecision,
+        *,
+        include_graph: bool = False,
+        graph: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        node = self._decision_node(decision)
+        payload: dict[str, Any] = {
+            "query": symbol,
+            "node": node,
+            "anchor_decision": anchor_decision_to_dict(decision),
+            "full_graph": _serialize_active_graph(),
+            **self._policy_payload_fields(),
+        }
+        if decision.candidates:
+            payload["candidates"] = _serialize_candidates(decision.candidates)
+        if include_graph:
+            payload["graph"] = graph if graph is not None else _empty_expansion_graph()
         return payload
 
-    def admin_install_score(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Synchronous admin helper for harness-side validation (non-global runtime)."""
-
-        return self._install_score(arguments)
-
-    def admin_verify_score(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Synchronous admin helper for harness-side validation (non-global runtime)."""
-
-        return self._verify_score(arguments)
-
-    def _resolve_effective_score_fn(self) -> tuple[SelectionCallable, str, str | None]:
-        if self._installed_score_fn is not None:
-            return self._installed_score_fn, "installed", self._active_score_id
-        if self._require_score_install:
-            raise RuntimeError("score install required before evaluator tools can run")
-
-        score_fn, score_source = _resolve_fallback_score_fn(self._score_fn)
-        return score_fn, score_source, None
+    def _decision_node(self, decision: AnchorDecision) -> dict[str, Any] | None:
+        if decision.status != "resolved" or decision.selected_anchor_id is None:
+            return None
+        store = exploration.get_active_store()
+        if store is None:
+            return None
+        node = store._node_for_id(  # pyright: ignore[reportPrivateUsage]
+            decision.selected_anchor_id
+        )
+        if node is None:
+            return None
+        return _serialize_resolved_node(node)
 
     def _resolve_and_expand(
         self,
         arguments: dict[str, Any],
-        score_fn: SelectionCallable,
-        score_source: str,
-        active_score_id: str | None,
+        lookahead_policy: LookaheadPolicyCallable,
     ) -> dict[str, Any]:
         symbol = _take_anchor_symbol(arguments)
-        depth = _take_depth(arguments, default=1)
+        budget = _take_depth(arguments, default=1)
         self._ensure_graph_ready()
 
-        node, candidates = _resolve_lookup(symbol)
-        if candidates is not None:
-            return _resolve_tool_payload(
+        decision = self._resolve_anchor_decision(symbol)
+        if (
+            decision.status != "resolved"
+            or decision.selected_anchor_id is None
+            or budget <= 0
+        ):
+            return self._resolve_payload_from_decision(
                 symbol,
-                score_source=score_source,
-                active_score_id=active_score_id,
+                decision,
                 include_graph=True,
+                graph=_empty_expansion_graph(),
             )
 
-        if node is None:
-            return {
-                "node": None,
-                "graph": _empty_expansion_graph(),
-                "full_graph": _serialize_active_graph(),
-                "score_source": score_source,
-                "active_score_id": active_score_id,
-            }
-
-        return {
-            "node": node,
-            "graph": exploration.expand(node["id"], depth=depth, score_fn=score_fn),
-            "full_graph": _serialize_active_graph(),
-            "score_source": score_source,
-            "active_score_id": active_score_id,
-        }
+        graph = exploration.expand(
+            decision.selected_anchor_id,
+            depth=budget,
+            score_fn=lookahead_policy,
+        )
+        return self._resolve_payload_from_decision(
+            symbol,
+            decision,
+            include_graph=True,
+            graph=cast(dict[str, Any], graph),
+        )
 
 
 def _take_anchor_symbol(arguments: dict[str, Any]) -> str:
@@ -411,6 +657,25 @@ def _require_str(arguments: dict[str, Any], key: str) -> str:
     return value
 
 
+def _require_non_empty_str(arguments: dict[str, Any], key: str) -> str:
+    value = _require_str(arguments, key).strip()
+    if not value:
+        raise ValueError(f"{key} must be a non-empty string")
+    return value
+
+
+def _optional_str(
+    arguments: dict[str, Any], key: str, *, default: str | None = None
+) -> str | None:
+    value = arguments.get(key, default)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{key} must be a string")
+    stripped = value.strip()
+    return stripped or None
+
+
 def _require_int(arguments: dict[str, Any], key: str) -> int:
     value = arguments.get(key)
     if not isinstance(value, int):
@@ -418,7 +683,14 @@ def _require_int(arguments: dict[str, Any], key: str) -> int:
     return value
 
 
-def load_policy_callable(policy_path: str | Path, symbol: str = "score_fn") -> SelectionCallable:
+def _sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as fh:
+        hasher.update(fh.read())
+    return hasher.hexdigest()
+
+
+def _load_policy_module(policy_path: str | Path) -> ModuleType:
     path = Path(policy_path).expanduser().resolve()
     if not path.is_file():
         raise FileNotFoundError(f"policy module not found: {path}")
@@ -430,40 +702,105 @@ def load_policy_callable(policy_path: str | Path, symbol: str = "score_fn") -> S
 
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-
-    candidate = getattr(module, symbol, None)
-    if candidate is None and symbol == "score_fn":
-        candidate = getattr(module, "score", None)
-    if not callable(candidate):
-        raise ValueError(f"policy module {path} does not define callable {symbol}")
-    return cast(SelectionCallable, candidate)
+    return module
 
 
-def load_local_policy() -> SelectionCallable | None:
-    """Dynamically load a local policy module if present."""
-    try:
-        policy_module = importlib.import_module("iterative_context.policy")
-    except Exception:
+def _load_optional_behavior_callable(
+    module: ModuleType, policy_path: Path, symbol: str | None
+) -> ResolvePolicyCallable | None:
+    if symbol is None:
         return None
+    candidate = getattr(module, symbol, None)
+    if candidate is None:
+        return None
+    if not callable(candidate):
+        raise ValueError(f"policy module {policy_path} defines non-callable {symbol}")
+    _validate_callable_signature(
+        candidate,
+        expected_arity=3,
+        policy_path=policy_path,
+        symbol=symbol,
+    )
+    return cast(ResolvePolicyCallable, candidate)
 
-    candidate = getattr(policy_module, "score_fn", None) or getattr(policy_module, "score", None)
-    if callable(candidate):
-        return cast(SelectionCallable, candidate)
-    return None
+
+def _load_required_behavior_callable(
+    module: ModuleType, policy_path: Path, symbol: str | None
+) -> ResolvePolicyCallable:
+    candidate = _load_optional_behavior_callable(module, policy_path, symbol)
+    if candidate is None:
+        raise ValueError(f"policy module {policy_path} does not define callable {symbol}")
+    return candidate
 
 
-def _resolve_fallback_score_fn(
-    injected_score_fn: SelectionCallable | None,
-) -> tuple[SelectionCallable, str]:
-    """Resolve the scoring function with explicit precedence."""
-    if injected_score_fn is not None:
-        return injected_score_fn, "injected"
+def _load_optional_selection_callable(
+    module: ModuleType, policy_path: Path, symbol: str | None
+) -> LookaheadPolicyCallable | None:
+    if symbol is None:
+        return None
+    candidate = getattr(module, symbol, None)
+    if candidate is None:
+        return None
+    if not callable(candidate):
+        raise ValueError(f"policy module {policy_path} defines non-callable {symbol}")
+    _validate_callable_signature(
+        candidate,
+        expected_arity=3,
+        policy_path=policy_path,
+        symbol=symbol,
+    )
+    return cast(LookaheadPolicyCallable, candidate)
 
-    local_policy = load_local_policy()
-    if local_policy is not None:
-        return local_policy, "local_policy"
 
-    return default_score_fn, "default"
+def _load_required_selection_callable(
+    module: ModuleType, policy_path: Path, symbol: str | None
+) -> LookaheadPolicyCallable:
+    candidate = _load_optional_selection_callable(module, policy_path, symbol)
+    if candidate is None:
+        raise ValueError(f"policy module {policy_path} does not define callable {symbol}")
+    return candidate
+
+
+def load_policy_callable(
+    policy_path: str | Path, symbol: str = "lookahead_policy"
+) -> LookaheadPolicyCallable:
+    path = Path(policy_path).expanduser().resolve()
+    module = _load_policy_module(path)
+    return _load_required_selection_callable(module, path, symbol)
+
+
+def _validate_callable_signature(
+    candidate: Any,
+    *,
+    expected_arity: int,
+    policy_path: Path,
+    symbol: str,
+) -> None:
+    try:
+        signature = inspect.signature(candidate)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"policy module {policy_path} exposes {symbol} with unreadable signature"
+        ) from exc
+
+    positional_params = [
+        parameter
+        for parameter in signature.parameters.values()
+        if parameter.kind
+        in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    ]
+    has_varargs = any(
+        parameter.kind is inspect.Parameter.VAR_POSITIONAL
+        for parameter in signature.parameters.values()
+    )
+    if has_varargs or len(positional_params) != expected_arity:
+        raise ValueError(
+            f"policy module {policy_path} callable {symbol} must accept exactly "
+            f"{expected_arity} positional parameters"
+        )
 
 
 _default_runtime = IterativeContextToolRuntime()
@@ -481,16 +818,29 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     return await _default_runtime.call_tool(name, arguments)
 
 
-async def install_score(
-    policy_path: str, policy_id: str, symbol: str = "score_fn"
+async def install_policy(
+    policy_path: str,
+    policy_id: str,
+    *,
+    resolve_policy_symbol: str = "resolve_policy",
+    lookahead_policy_symbol: str = "lookahead_policy",
 ) -> dict[str, Any]:
-    return _default_runtime.admin_install_score(
-        {"policy_path": policy_path, "policy_id": policy_id, "symbol": symbol}
+    return _default_runtime.admin_install_policy(
+        {
+            "policy_path": policy_path,
+            "policy_id": policy_id,
+            "resolve_policy_symbol": resolve_policy_symbol,
+            "lookahead_policy_symbol": lookahead_policy_symbol,
+        }
     )
 
 
-async def verify_score(policy_id: str) -> dict[str, Any]:
-    return _default_runtime.admin_verify_score({"policy_id": policy_id})
+async def verify_policy(policy_id: str) -> dict[str, Any]:
+    return _default_runtime.admin_verify_policy({"policy_id": policy_id})
+
+
+async def describe_policy() -> dict[str, Any]:
+    return _default_runtime.admin_describe_policy()
 
 
 @server.list_tools()
@@ -506,7 +856,6 @@ async def _server_call_tool(  # pyright: ignore[reportUnusedFunction]
 
 
 def main() -> None:
-    """Run the MCP server over stdio (for SearchBench and other MCP clients)."""
     import anyio  # noqa: PLC0415
     from mcp.server.stdio import stdio_server  # noqa: PLC0415
 
@@ -527,8 +876,9 @@ __all__ = [
     "list_tools",
     "list_admin_tools",
     "call_tool",
-    "install_score",
-    "verify_score",
+    "install_policy",
+    "verify_policy",
+    "describe_policy",
     "load_policy_callable",
     "main",
 ]

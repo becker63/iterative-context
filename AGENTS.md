@@ -75,6 +75,31 @@ uv run basedpyright && uv run pytest
 * No randomness or time-based logic
 * Keep implementations simple and explicit
 
+### Policy surface
+
+The installable optimization surface is behavior-oriented, not only score-oriented.
+
+Canonical admin tools:
+
+* `install_policy`
+* `verify_policy`
+* `describe_policy`
+
+Evaluator-visible tools must not expose admin tools.
+
+Behavior policy modules may define:
+
+* `resolve_policy(query, candidates, state) -> AnchorDecision`
+* `lookahead_policy(node, graph, step) -> float`
+
+Keep this split clear:
+
+* candidate generation = IC mechanism
+* anchor decision = installed behavior policy
+* traversal/frontier behavior = installed behavior policy
+
+`AnchorDecision` is the canonical structured output for fuzzy anchor behavior and future replay derivation.
+
 ---
 
 ## 🚫 Constraints
