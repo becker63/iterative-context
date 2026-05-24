@@ -7,7 +7,7 @@ import pytest
 from iterative_context.graph_models import Graph, GraphNode
 from iterative_context.scoring import default_score_fn
 from iterative_context.test_helpers import build_graph, normalize_graph
-from iterative_context.traversal import run_traversal
+from iterative_context.traversal import _rank_frontier_candidates, run_traversal
 from iterative_context.types import SelectionCallable
 
 
@@ -97,3 +97,25 @@ def test_determinism_with_callable() -> None:
     run_traversal(graph_two, steps=2, score_fn=prefer_a)
 
     assert normalize_graph(graph_one) == normalize_graph(graph_two)
+
+
+def test_ranked_frontier_candidates_preserve_source_edge_metadata() -> None:
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": "root", "kind": "symbol", "state": "anchor"},
+                {"id": "child", "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [
+                {"source": "root", "target": "child", "kind": "calls"},
+            ],
+        }
+    )  # type: ignore[arg-type]
+    candidates = [cast(GraphNode, graph.nodes["child"]["data"])]
+
+    ranked = _rank_frontier_candidates(candidates, graph, 0, default_score_fn)
+
+    assert len(ranked) == 1
+    assert ranked[0].source_id == "root"
+    assert ranked[0].edge_kind == "calls"
+    assert ranked[0].rank == 1

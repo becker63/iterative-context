@@ -168,6 +168,8 @@ def _rank_frontier_candidates(
             kind=candidate.kind,
             score=candidate.score,
             rank=index,
+            edge_kind=candidate.edge_kind,
+            source_id=candidate.source_id,
             metadata=candidate.metadata,
         )
         for index, candidate in enumerate(ordered, start=1)

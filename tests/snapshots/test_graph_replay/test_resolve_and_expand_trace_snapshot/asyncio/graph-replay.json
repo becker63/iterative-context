@@ -50,6 +50,22 @@
       "type": "addNodes"
     },
     {
+      "edges": [
+        {
+          "kind": "references",
+          "source": "B",
+          "target": "C"
+        },
+        {
+          "kind": "calls",
+          "source": "A",
+          "target": "B"
+        }
+      ],
+      "reason": "frontier_visible",
+      "type": "addEdges"
+    },
+    {
       "id": "C",
       "patch": {
         "rank": 1,
@@ -183,7 +199,7 @@
     "anchorAmbiguous": 0,
     "anchorNotFound": 0,
     "anchorResolved": 1,
-    "eventCount": 18,
+    "eventCount": 19,
     "expandCalls": 1,
     "frontierCandidateCount": 3,
     "hiddenCandidateCount": 0,

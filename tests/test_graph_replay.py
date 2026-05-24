@@ -16,6 +16,7 @@ from iterative_context.graph_models import (
     AddNodesEvent,
     Graph,
     GraphEdge,
+    GraphNode,
     PendingNode,
     UpdateNodeEvent,
 )
@@ -26,6 +27,7 @@ from iterative_context.graph_replay import (
 )
 from iterative_context.server import IterativeContextToolRuntime
 from iterative_context.test_helpers.graph_dsl import build_graph
+from iterative_context.traversal import run_traversal
 
 
 @pytest.fixture(autouse=True)
@@ -573,6 +575,56 @@ def test_frontier_decision_emits_compact_score_rank_and_source_causality() -> No
     edge_event = next(event for event in events if event["type"] == "addEdges")
     assert score_update["patch"] == {"score": 0.73, "rank": 1}
     assert edge_event["edges"] == [{"source": "root", "target": "child", "kind": "calls"}]
+
+
+def test_real_traversal_replay_preserves_ranked_candidate_source_edges() -> None:
+    recorder = GraphReplayRecorder(max_visible_pending=2)
+    recorder.add_nodes(
+        [{"id": "root", "kind": "symbol", "state": "anchor", "label": "root"}],
+        reason="selected_anchor",
+    )
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": "root", "kind": "symbol", "state": "anchor"},
+                {"id": "child", "kind": "symbol", "state": "pending"},
+                {"id": "other", "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [
+                {"source": "root", "target": "child", "kind": "calls"},
+            ],
+        }
+    )
+
+    def prefer_child(node: GraphNode, graph: Graph, step: int) -> float:
+        del graph, step
+        return 10.0 if node.id == "child" else 1.0
+
+    run_traversal(graph, steps=1, score_fn=prefer_child, observer=recorder)
+    payload = recorder.collect(
+        trace_id="trace-002d",
+        metadata={},
+        policy_id="policy-v1",
+        clear_after_collect=False,
+    )
+
+    events = _payload_events(payload)
+    visible_edge_event = next(
+        event
+        for event in events
+        if event["type"] == "addEdges"
+        and {"source": "root", "target": "child", "kind": "calls"} in event["edges"]
+    )
+    child_score_event = next(
+        event
+        for event in events
+        if event["type"] == "updateNode"
+        and event["id"] == "child"
+        and event.get("reason") == "candidate_scored"
+    )
+    assert visible_edge_event["reason"] == "frontier_visible"
+    assert child_score_event["patch"]["rank"] == 1
+    assert child_score_event["patch"]["score"] == 10.0
 
 
 def test_observe_expansion_emits_discovered_nodes_and_edges() -> None:
