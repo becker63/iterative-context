@@ -41,7 +41,12 @@ def resolve_policy(query, candidates, state):
 
 
 def test_missing_policy_path_fails() -> None:
-    out = validate_policy(Path("/no/such/policy_candidate.py"), "pid", "lookahead_policy")
+    out = validate_policy(
+        Path("/no/such/policy_candidate.py"),
+        "pid",
+        "resolve_policy",
+        "lookahead_policy",
+    )
     assert out["ok"] is False
     assert out["stage"] == "policy_path"
 
@@ -49,7 +54,7 @@ def test_missing_policy_path_fails() -> None:
 def test_empty_policy_fails(tmp_path: Path) -> None:
     p = tmp_path / "p.py"
     _write_policy(p, "   \n")
-    out = validate_policy(p, "pid", "lookahead_policy")
+    out = validate_policy(p, "pid", "resolve_policy", "lookahead_policy")
     assert out["ok"] is False
     assert out["stage"] == "empty_policy"
 
@@ -57,7 +62,7 @@ def test_empty_policy_fails(tmp_path: Path) -> None:
 def test_markdown_fence_fails(tmp_path: Path) -> None:
     p = tmp_path / "p.py"
     _write_policy(p, "```python\ndef lookahead_policy():\n  pass\n```")
-    out = validate_policy(p, "pid", "lookahead_policy")
+    out = validate_policy(p, "pid", "resolve_policy", "lookahead_policy")
     assert out["ok"] is False
     assert out["stage"] == "markdown_fence"
 
@@ -65,7 +70,7 @@ def test_markdown_fence_fails(tmp_path: Path) -> None:
 def test_missing_symbol_fails(tmp_path: Path) -> None:
     p = tmp_path / "p.py"
     _write_policy(p, "x = 1\n")
-    out = validate_policy(p, "pid", "lookahead_policy")
+    out = validate_policy(p, "pid", "resolve_policy", "lookahead_policy")
     assert out["ok"] is False
     assert out["stage"] == "symbol"
 
@@ -73,7 +78,7 @@ def test_missing_symbol_fails(tmp_path: Path) -> None:
 def test_non_callable_symbol_fails(tmp_path: Path) -> None:
     p = tmp_path / "p.py"
     _write_policy(p, "lookahead_policy = 123\n")
-    out = validate_policy(p, "pid", "lookahead_policy")
+    out = validate_policy(p, "pid", "resolve_policy", "lookahead_policy")
     assert out["ok"] is False
 
 
@@ -94,7 +99,7 @@ def test_bad_lookahead_signature_fails(tmp_path: Path) -> None:
             "    }\n"
         ),
     )
-    out = validate_policy(p, "pid", "lookahead_policy")
+    out = validate_policy(p, "pid", "resolve_policy", "lookahead_policy")
     assert out["ok"] is False
     assert out["stage"] == "symbol"
     assert "exactly 3 positional parameters" in out["message"]
@@ -103,12 +108,17 @@ def test_bad_lookahead_signature_fails(tmp_path: Path) -> None:
 def test_valid_policy_passes(tmp_path: Path) -> None:
     p = tmp_path / "p.py"
     _write_policy(p, _full_policy_source())
-    out = validate_policy(p, "next-challenger-test", "lookahead_policy")
+    out = validate_policy(
+        p, "next-challenger-test", "resolve_policy", "lookahead_policy"
+    )
     assert out["ok"] is True
     assert out["policy_id"] == "next-challenger-test"
-    assert out["symbol"] == "lookahead_policy"
+    assert out["resolve_policy_symbol"] == "resolve_policy"
+    assert out["lookahead_policy_symbol"] == "lookahead_policy"
     assert any(s.get("name") == "install_policy" and s.get("ok") for s in out["stages"])
     assert any(s.get("name") == "verify_policy" and s.get("ok") for s in out["stages"])
+    assert out["interface_version"] == "iterative_context.behavior_policy.v1"
+    assert out["policy_sha"] == out["sha256"]
     assert "sha256" in out
 
 
@@ -124,7 +134,9 @@ def test_cli_json_success(tmp_path: Path) -> None:
             str(p),
             "--policy-id",
             "cli-policy",
-            "--symbol",
+            "--resolve-symbol",
+            "resolve_policy",
+            "--lookahead-symbol",
             "lookahead_policy",
             "--json",
         ],
@@ -150,7 +162,9 @@ def test_cli_json_failure_exit_code(tmp_path: Path) -> None:
             str(p),
             "--policy-id",
             "cli-policy",
-            "--symbol",
+            "--resolve-symbol",
+            "resolve_policy",
+            "--lookahead-symbol",
             "lookahead_policy",
             "--json",
         ],
@@ -173,7 +187,9 @@ def test_main_wrapper_json(tmp_path: Path) -> None:
             str(p),
             "--policy-id",
             "wrap",
-            "--symbol",
+            "--resolve-symbol",
+            "resolve_policy",
+            "--lookahead-symbol",
             "lookahead_policy",
             "--json",
         ]

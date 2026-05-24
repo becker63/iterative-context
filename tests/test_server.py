@@ -2,6 +2,7 @@
 # pyright: reportPrivateUsage=false
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Iterator
 from pathlib import Path
@@ -159,13 +160,24 @@ async def test_list_tools_definitions() -> None:
 async def test_list_admin_tools_definitions() -> None:
     tools = await list_admin_tools()
     names = {tool.name for tool in tools}
-    assert names == {"install_policy", "verify_policy", "describe_policy"}
+    assert names == {
+        "install_policy",
+        "verify_policy",
+        "describe_policy",
+        "collect_graph_trace",
+    }
+    assert "start_graph_trace" not in names
+    assert "clear_graph_trace" not in names
+    assert "describe_graph_trace" not in names
 
     install_tool = next(tool for tool in tools if tool.name == "install_policy")
     assert install_tool.inputSchema["required"] == ["policy_path", "policy_id"]
 
     verify_tool = next(tool for tool in tools if tool.name == "verify_policy")
     assert verify_tool.inputSchema["required"] == ["policy_id"]
+
+    collect_tool = next(tool for tool in tools if tool.name == "collect_graph_trace")
+    assert collect_tool.inputSchema["required"] == ["trace_id"]
 
 
 @pytest.mark.anyio
@@ -361,6 +373,7 @@ async def test_runtime_requires_install_before_evaluator_tools(tmp_path: Path) -
     expanded = await runtime.call_tool("expand", {"node_id": "A", "depth": 1})
     expanded_payload = json.loads(expanded[0].text)
     assert expanded_payload["active_policy_id"] == "policy-v1"
+    assert expanded_payload["active_behavior_policy_id"] == "policy-v1"
     assert expanded_payload["graph"]["metadata"]["expanded_from"] == "A"
 
 
@@ -375,9 +388,15 @@ async def test_runtime_verify_policy_reports_missing_and_mismatch(tmp_path: Path
     assert "no policy installed" in missing_payload["error"]
 
     policy_path = _write_policy(tmp_path, score_value=5.0)
+    policy_source = policy_path.read_text(encoding="utf-8")
+    policy_sha = hashlib.sha256(policy_source.encode("utf-8")).hexdigest()
     await runtime.call_tool(
         "install_policy",
-        {"policy_path": str(policy_path), "policy_id": "policy-v1"},
+        {
+            "policy_path": str(policy_path),
+            "policy_id": "policy-v1",
+            "interface_version": "iterative_context.behavior_policy.v1",
+        },
     )
 
     mismatch = await runtime.call_tool("verify_policy", {"policy_id": "policy-v2"})
@@ -386,11 +405,20 @@ async def test_runtime_verify_policy_reports_missing_and_mismatch(tmp_path: Path
     assert mismatch_payload["error_code"] == "policy_mismatch"
     assert "expected policy-v2, got policy-v1" in mismatch_payload["error"]
 
-    verified = await runtime.call_tool("verify_policy", {"policy_id": "policy-v1"})
+    verified = await runtime.call_tool(
+        "verify_policy",
+        {
+            "policy_id": "policy-v1",
+            "policy_sha": policy_sha,
+            "interface_version": "iterative_context.behavior_policy.v1",
+        },
+    )
     verified_payload = json.loads(verified[0].text)
     assert verified_payload["ok"] is True
     assert verified_payload["policy_id"] == "policy-v1"
     assert verified_payload["policy_source"] == "installed"
+    assert verified_payload["resolve_policy_symbol"] == "resolve_policy"
+    assert verified_payload["lookahead_policy_symbol"] == "lookahead_policy"
 
 
 @pytest.mark.anyio
@@ -399,7 +427,12 @@ async def test_runtime_describe_policy_returns_active_metadata(tmp_path: Path) -
     policy_path = _write_policy(tmp_path, score_value=4.0)
     await runtime.call_tool(
         "install_policy",
-        {"policy_path": str(policy_path), "policy_id": "policy-v1"},
+        {
+            "policy_path": str(policy_path),
+            "policy_id": "policy-v1",
+            "resolve_policy_symbol": "resolve_policy",
+            "lookahead_policy_symbol": "lookahead_policy",
+        },
     )
 
     described = await runtime.call_tool("describe_policy", {})
@@ -408,7 +441,10 @@ async def test_runtime_describe_policy_returns_active_metadata(tmp_path: Path) -
     assert payload["ok"] is True
     assert payload["active"] is True
     assert payload["policy_id"] == "policy-v1"
+    assert payload["resolve_policy_symbol"] == "resolve_policy"
+    assert payload["lookahead_policy_symbol"] == "lookahead_policy"
     assert payload["has_lookahead_policy"] is True
+    assert payload["has_resolve_policy"] is True
 
 
 @pytest.mark.anyio

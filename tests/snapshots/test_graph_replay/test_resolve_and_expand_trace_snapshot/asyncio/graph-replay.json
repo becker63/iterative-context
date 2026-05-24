@@ -1,0 +1,139 @@
+{
+  "attemptId": "attempt-001",
+  "events": [
+    {
+      "description": "resolve_query",
+      "step": 1,
+      "type": "iteration"
+    },
+    {
+      "nodes": [
+        {
+          "id": "A",
+          "kind": "symbol",
+          "label": "expand_node",
+          "state": "pending"
+        }
+      ],
+      "reason": "anchor_candidates",
+      "type": "addNodes"
+    },
+    {
+      "id": "A",
+      "patch": {
+        "state": "anchor"
+      },
+      "reason": "selected_anchor",
+      "type": "updateNode"
+    },
+    {
+      "description": "lookahead_step_1",
+      "step": 2,
+      "type": "iteration"
+    },
+    {
+      "nodes": [
+        {
+          "id": "C",
+          "kind": "symbol",
+          "label": "fetch_user_data",
+          "state": "pending"
+        },
+        {
+          "id": "B",
+          "kind": "symbol",
+          "label": "expand_other",
+          "state": "pending"
+        }
+      ],
+      "reason": "frontier_visible",
+      "type": "addNodes"
+    },
+    {
+      "nodes": [
+        {
+          "id": "C_child",
+          "kind": "symbol",
+          "state": "pending"
+        }
+      ],
+      "reason": "frontier_discovered",
+      "type": "addNodes"
+    },
+    {
+      "edges": [
+        {
+          "kind": "calls",
+          "source": "C",
+          "target": "C_child"
+        }
+      ],
+      "reason": "frontier_discovered",
+      "type": "addEdges"
+    },
+    {
+      "id": "C",
+      "patch": {
+        "state": "resolved",
+        "tokens": 1
+      },
+      "reason": "frontier_selected",
+      "type": "updateNode"
+    },
+    {
+      "description": "lookahead_step_2",
+      "step": 3,
+      "type": "iteration"
+    },
+    {
+      "nodes": [
+        {
+          "id": "C_child_child",
+          "kind": "symbol",
+          "state": "pending"
+        }
+      ],
+      "reason": "frontier_discovered",
+      "type": "addNodes"
+    },
+    {
+      "edges": [
+        {
+          "kind": "calls",
+          "source": "C_child",
+          "target": "C_child_child"
+        }
+      ],
+      "reason": "frontier_discovered",
+      "type": "addEdges"
+    },
+    {
+      "id": "C_child",
+      "patch": {
+        "state": "resolved",
+        "tokens": 1
+      },
+      "reason": "frontier_selected",
+      "type": "updateNode"
+    }
+  ],
+  "kind": "searchbench.graph_replay.v1",
+  "matchId": "match-a",
+  "metadata": {
+    "round_id": "round-001"
+  },
+  "policyId": "policy-v1",
+  "role": "challenger",
+  "source": "iterative-context",
+  "summary": {
+    "anchorAmbiguous": 0,
+    "anchorNotFound": 0,
+    "anchorResolved": 1,
+    "eventCount": 12,
+    "expandCalls": 1,
+    "lookaheadSteps": 2,
+    "resolveCalls": 1,
+    "visibleFrontierLimit": 4
+  },
+  "traceId": "round-001/match-a/challenger/attempt-001"
+}

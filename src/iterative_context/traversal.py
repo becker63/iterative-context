@@ -8,6 +8,7 @@ from typing import Protocol, cast
 
 from iterative_context.expansion import expand_node
 from iterative_context.graph_models import Graph, GraphEvent, GraphNode
+from iterative_context.graph_replay import FrontierCandidate, FrontierDecision, GraphReplayObserver
 from iterative_context.scoring import default_score_fn
 from iterative_context.selection_policy import CallableSelectionPolicy
 from iterative_context.test_helpers.graph_dsl import apply_events
@@ -74,6 +75,7 @@ def run_traversal(
     steps: int,
     expansion_policy: ExpansionPolicy | None = None,
     score_fn: SelectionCallable | None = None,
+    observer: GraphReplayObserver | None = None,
 ) -> Graph:
     """Run N expansion steps using the provided scoring policy."""
     policy_wrapper = CallableSelectionPolicy(score_fn or default_score_fn)
@@ -85,11 +87,75 @@ def run_traversal(
         if not candidates:
             break
         node = select_next_node(candidates, graph, step, policy_wrapper.score)
+        if observer is not None:
+            observer.observe_frontier_decision(
+                FrontierDecision(
+                    step=step,
+                    candidates=_rank_frontier_candidates(
+                        candidates,
+                        graph,
+                        step,
+                        policy_wrapper.score,
+                    ),
+                    selected_node_id=node.id,
+                )
+            )
         score_history.append(graph.graph.get("last_scores", []))
         events = active_expansion_policy.expand(node, graph)
+        if observer is not None:
+            observer.observe_expansion(node.id, list(events), graph)
         apply_events(graph, events)
         graph.graph["graph_steps"].append(copy.deepcopy(graph))
     return graph
+
+
+def _rank_frontier_candidates(
+    candidates: Sequence[GraphNode],
+    graph: Graph,
+    step: int,
+    score_fn: SelectionCallable,
+) -> list[FrontierCandidate]:
+    scored: list[FrontierCandidate] = []
+    for node in candidates:
+        raw = cast(object, graph.nodes.get(node.id))
+        label = getattr(node, "label", None)
+        metadata: dict[str, object] = {}
+        if isinstance(raw, dict):
+            typed_raw = cast(dict[str, object], raw)
+            symbol_value = typed_raw.get("symbol")
+            if isinstance(symbol_value, str) and not label:
+                label = symbol_value
+            if isinstance(symbol_value, str):
+                metadata["symbol"] = symbol_value
+            file_value = typed_raw.get("file")
+            if isinstance(file_value, str):
+                metadata["file"] = file_value
+        scored.append(
+            FrontierCandidate(
+                node_id=node.id,
+                label=label,
+                kind=node.kind,
+                score=score_fn(node, graph, step),
+                rank=0,
+                metadata=metadata or None,
+            )
+        )
+    ordered = sorted(
+        scored,
+        key=lambda candidate: (candidate.score, candidate.node_id),
+        reverse=True,
+    )
+    return [
+        FrontierCandidate(
+            node_id=candidate.node_id,
+            label=candidate.label,
+            kind=candidate.kind,
+            score=candidate.score,
+            rank=index,
+            metadata=candidate.metadata,
+        )
+        for index, candidate in enumerate(ordered, start=1)
+    ]
 
 
 __all__ = [

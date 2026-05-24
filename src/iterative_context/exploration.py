@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal, TypedDict, cast
 
 from iterative_context.graph_models import Graph, GraphEdge, GraphNode, PendingNode
+from iterative_context.graph_replay import GraphReplayObserver
 from iterative_context.injest.llm_tldr_adapter import ingest_repo
 from iterative_context.normalize import raw_tree_to_graph
 from iterative_context.scoring import default_score_fn
@@ -189,6 +190,7 @@ def expand(
     node_id: str,
     depth: int = 1,
     score_fn: SelectionCallable | None = None,
+    observer: GraphReplayObserver | None = None,
 ) -> GraphSnapshotDict:
     """
     Deterministic bounded expansion using internal traversal.
@@ -224,6 +226,7 @@ def expand(
         steps=steps,
         expansion_policy=DefaultExpansionPolicy(),
         score_fn=score_fn or default_score_fn,
+        observer=observer,
     )
 
     visited: set[str] = set()
@@ -247,17 +250,23 @@ def expand(
     )
 
 
-def expand_with_policy(node_id: str, depth: int, score_fn: SelectionCallable) -> GraphSnapshotDict:
-    return expand(node_id=node_id, depth=depth, score_fn=score_fn)
+def expand_with_policy(
+    node_id: str,
+    depth: int,
+    score_fn: SelectionCallable,
+    observer: GraphReplayObserver | None = None,
+) -> GraphSnapshotDict:
+    return expand(node_id=node_id, depth=depth, score_fn=score_fn, observer=observer)
 
 
 def resolve_and_expand(
     symbol: str,
     depth: int = 1,
     score_fn: SelectionCallable | None = None,
+    observer: GraphReplayObserver | None = None,
 ) -> GraphSnapshotDict:
     """Composition only: resolve first, then expand deterministically."""
     node = resolve(symbol)
     if node is None:
         return cast(GraphSnapshotDict, {"nodes": [], "edges": [], "metadata": {}})
-    return expand(node.id, depth=depth, score_fn=score_fn)
+    return expand(node.id, depth=depth, score_fn=score_fn, observer=observer)

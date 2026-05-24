@@ -10,7 +10,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from iterative_context.server import IterativeContextToolRuntime, load_policy_callable
+from iterative_context.anchor_policy import POLICY_INTERFACE_VERSION
+from iterative_context.server import (
+    IterativeContextToolRuntime,
+    load_policy_callable,
+    load_resolve_policy_callable,
+)
 
 
 def _policy_has_markdown_fence(src: str) -> bool:
@@ -21,19 +26,34 @@ def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _install_verify_smoke(
-    rt: IterativeContextToolRuntime, policy_path: Path, policy_id: str, symbol: str
+def _install_verify_smoke(  # noqa: PLR0913
+    rt: IterativeContextToolRuntime,
+    policy_path: Path,
+    policy_id: str,
+    *,
+    policy_sha: str,
+    interface_version: str,
+    resolve_symbol: str,
+    lookahead_symbol: str,
 ) -> None:
     payload = rt.admin_install_policy(
         {
             "policy_path": str(policy_path),
             "policy_id": policy_id,
-            "lookahead_policy_symbol": symbol,
+            "interface_version": interface_version,
+            "resolve_policy_symbol": resolve_symbol,
+            "lookahead_policy_symbol": lookahead_symbol,
         }
     )
     if not payload.get("ok"):
         raise RuntimeError(f"install_policy failed: {payload}")
-    verify = rt.admin_verify_policy({"policy_id": policy_id})
+    verify = rt.admin_verify_policy(
+        {
+            "policy_id": policy_id,
+            "policy_sha": policy_sha,
+            "interface_version": interface_version,
+        }
+    )
     if not verify.get("ok"):
         raise RuntimeError(f"verify_policy failed: {verify}")
 
@@ -54,7 +74,10 @@ async def _strict_requires_install_before_tools(rt: IterativeContextToolRuntime)
 
 
 async def validate_policy_async(  # noqa: PLR0911
-    policy_path: Path, policy_id: str, symbol: str
+    policy_path: Path,
+    policy_id: str,
+    resolve_symbol: str,
+    lookahead_symbol: str,
 ) -> dict[str, Any]:
     """Run staged validation and return a structured result dict."""
     stages: list[dict[str, Any]] = []
@@ -66,7 +89,8 @@ async def validate_policy_async(  # noqa: PLR0911
             "stage": "policy_path",
             "message": f"policy path does not exist or is not a file: {path}",
             "policy_id": policy_id,
-            "symbol": symbol,
+            "resolve_policy_symbol": resolve_symbol,
+            "lookahead_policy_symbol": lookahead_symbol,
         }
 
     raw = _read_text(path)
@@ -76,7 +100,8 @@ async def validate_policy_async(  # noqa: PLR0911
             "stage": "empty_policy",
             "message": "policy file is empty",
             "policy_id": policy_id,
-            "symbol": symbol,
+            "resolve_policy_symbol": resolve_symbol,
+            "lookahead_policy_symbol": lookahead_symbol,
         }
 
     if _policy_has_markdown_fence(raw):
@@ -86,28 +111,32 @@ async def validate_policy_async(  # noqa: PLR0911
             "message": "policy file contains markdown code fences (```)",
             "hint": "Emit raw Python only without fenced blocks.",
             "policy_id": policy_id,
-            "symbol": symbol,
+            "resolve_policy_symbol": resolve_symbol,
+            "lookahead_policy_symbol": lookahead_symbol,
         }
 
     stages.append({"name": "load_policy", "ok": True})
 
     try:
-        load_policy_callable(path, symbol)
+        load_resolve_policy_callable(path, resolve_symbol)
+        load_policy_callable(path, lookahead_symbol)
     except Exception as exc:  # noqa: BLE001 - surfaced to harness
         return {
             "ok": False,
             "stage": "symbol",
             "message": str(exc),
             "hint": (
-                f"Export def {symbol}(node, graph, step): "
-                "... returning a float traversal score."
+                "Export def resolve_policy(query, candidates, state): ... and "
+                "def lookahead_policy(node, graph, step): ... returning a float traversal score."
             ),
             "policy_id": policy_id,
-            "symbol": symbol,
+            "resolve_policy_symbol": resolve_symbol,
+            "lookahead_policy_symbol": lookahead_symbol,
             "stages": stages,
         }
 
-    stages.append({"name": "callable_symbol", "ok": True})
+    stages.append({"name": "resolve_policy_symbol", "ok": True})
+    stages.append({"name": "lookahead_policy_symbol", "ok": True})
 
     rt = IterativeContextToolRuntime()
 
@@ -120,19 +149,30 @@ async def validate_policy_async(  # noqa: PLR0911
             "message": strict.get("message", "strict smoke failed"),
             "hint": strict.get("hint"),
             "policy_id": policy_id,
-            "symbol": symbol,
+            "resolve_policy_symbol": resolve_symbol,
+            "lookahead_policy_symbol": lookahead_symbol,
             "stages": stages,
         }
 
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
     try:
-        _install_verify_smoke(rt, path, policy_id, symbol)
+        _install_verify_smoke(
+            rt,
+            path,
+            policy_id,
+            policy_sha=digest,
+            interface_version=POLICY_INTERFACE_VERSION,
+            resolve_symbol=resolve_symbol,
+            lookahead_symbol=lookahead_symbol,
+        )
     except Exception as exc:  # noqa: BLE001
         return {
             "ok": False,
             "stage": "install_verify",
             "message": str(exc),
             "policy_id": policy_id,
-            "symbol": symbol,
+            "resolve_policy_symbol": resolve_symbol,
+            "lookahead_policy_symbol": lookahead_symbol,
             "stages": stages,
         }
 
@@ -145,23 +185,33 @@ async def validate_policy_async(  # noqa: PLR0911
         {
             "name": "evaluator_identity_smoke",
             "ok": True,
+            "active_behavior_policy_id": after_payload.get("active_behavior_policy_id"),
             "active_policy_id": after_payload.get("active_policy_id"),
         }
     )
 
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
     return {
         "ok": True,
         "policy_id": policy_id,
-        "symbol": symbol,
+        "policy_sha": digest,
+        "interface_version": POLICY_INTERFACE_VERSION,
+        "resolve_policy_symbol": resolve_symbol,
+        "lookahead_policy_symbol": lookahead_symbol,
         "policy_path": str(path),
         "sha256": digest,
         "stages": stages,
     }
 
 
-def validate_policy(policy_path: Path, policy_id: str, symbol: str) -> dict[str, Any]:
-    return asyncio.run(validate_policy_async(policy_path, policy_id, symbol))
+def validate_policy(
+    policy_path: Path,
+    policy_id: str,
+    resolve_symbol: str,
+    lookahead_symbol: str,
+) -> dict[str, Any]:
+    return asyncio.run(
+        validate_policy_async(policy_path, policy_id, resolve_symbol, lookahead_symbol)
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -172,11 +222,25 @@ def main(argv: list[str] | None = None) -> int:
         "--policy-path", required=True, help="Filesystem path to the policy .py file"
     )
     parser.add_argument("--policy-id", required=True, help="Stable policy identifier")
-    parser.add_argument("--symbol", required=True, help="Callable symbol to load from the module")
+    parser.add_argument(
+        "--resolve-symbol",
+        default="resolve_policy",
+        help="Resolve callable symbol to load from the module",
+    )
+    parser.add_argument(
+        "--lookahead-symbol",
+        default="lookahead_policy",
+        help="Lookahead callable symbol to load from the module",
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON to stdout")
     ns = parser.parse_args(argv)
 
-    result = validate_policy(Path(ns.policy_path), ns.policy_id.strip(), ns.symbol.strip())
+    result = validate_policy(
+        Path(ns.policy_path),
+        ns.policy_id.strip(),
+        ns.resolve_symbol.strip(),
+        ns.lookahead_symbol.strip(),
+    )
     if ns.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     elif not result.get("ok"):

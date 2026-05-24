@@ -25,6 +25,9 @@ from iterative_context.anchor_policy import (
     anchor_decision_to_dict,
 )
 from iterative_context.graph_models import GraphNode
+from iterative_context.graph_replay import (
+    GraphReplayRecorder,
+)
 from iterative_context.serialization import serialize_graph_summary, serialize_node
 from iterative_context.types import (
     LookaheadPolicyCallable,
@@ -251,6 +254,28 @@ def _admin_tool_definitions() -> list[Tool]:
             description="Describe the currently active policy metadata.",
             inputSchema={"type": "object", "properties": {}, "required": []},
         ),
+        Tool(
+            name="collect_graph_trace",
+            description="Collect the hidden graph replay trace for this runtime session.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "trace_id": {
+                        "type": "string",
+                        "description": "Opaque trace identity provided by the harness.",
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "description": "Opaque metadata labels echoed back in the replay payload.",
+                    },
+                    "clear_after_collect": {
+                        "type": "boolean",
+                        "description": "Whether to clear the in-memory trace after collection.",
+                    },
+                },
+                "required": ["trace_id"],
+            },
+        ),
     ]
 
 
@@ -264,6 +289,7 @@ class IterativeContextToolRuntime:
     def __init__(self, repo_root: str | Path | None = None):
         self._repo_root = Path(repo_root).resolve() if repo_root is not None else None
         self._installed_policy: InstalledPolicy | None = None
+        self._graph_replay = GraphReplayRecorder()
 
     async def list_tools(self) -> list[Tool]:
         return _tool_definitions()
@@ -290,6 +316,8 @@ class IterativeContextToolRuntime:
             return self._verify_policy(arguments)
         if tool_name == "describe_policy":
             return self._describe_policy()
+        if tool_name == "collect_graph_trace":
+            return self._collect_graph_trace(arguments)
 
         if tool_name == "resolve":
             self._ensure_policy_ready_for_evaluator()
@@ -301,7 +329,13 @@ class IterativeContextToolRuntime:
             node_id = _require_str(arguments, "node_id")
             depth = _require_int(arguments, "depth")
             self._ensure_graph_ready()
-            graph = exploration.expand(node_id=node_id, depth=depth, score_fn=lookahead_policy)
+            self._graph_replay.note_expand_call()
+            graph = exploration.expand(
+                node_id=node_id,
+                depth=depth,
+                score_fn=lookahead_policy,
+                observer=self._graph_replay,
+            )
             return {
                 "graph": graph,
                 "full_graph": _serialize_active_graph(),
@@ -327,14 +361,17 @@ class IterativeContextToolRuntime:
 
     def clear_policy_install(self) -> None:
         self._installed_policy = None
+        self._graph_replay.reset()
 
     def _policy_payload_fields(self) -> dict[str, object]:
         if self._installed_policy is None:
             return {
+                "active_behavior_policy_id": None,
                 "active_policy_id": None,
                 "policy_interface_version": POLICY_INTERFACE_VERSION,
             }
         return {
+            "active_behavior_policy_id": self._installed_policy.policy_id,
             "active_policy_id": self._installed_policy.policy_id,
             "policy_interface_version": self._installed_policy.interface_version,
             "policy_path": str(self._installed_policy.policy_path),
@@ -467,6 +504,32 @@ class IterativeContextToolRuntime:
     def admin_describe_policy(self) -> dict[str, Any]:
         return self._describe_policy()
 
+    def admin_collect_graph_trace(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        return self._collect_graph_trace(arguments)
+
+    def _collect_graph_trace(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        trace_id = _require_non_empty_str(arguments, "trace_id")
+        metadata = arguments.get("metadata")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise ToolPayloadError(
+                "graph_replay_request_invalid",
+                "metadata must be a mapping when provided",
+            )
+        clear_after_collect = _optional_bool(
+            arguments,
+            "clear_after_collect",
+            default=True,
+        )
+        try:
+            return self._graph_replay.collect(
+                trace_id=trace_id,
+                metadata=cast(dict[str, object] | None, metadata),
+                policy_id=self._installed_policy.policy_id if self._installed_policy else None,
+                clear_after_collect=clear_after_collect,
+            )
+        except ValueError as exc:
+            raise ToolPayloadError("graph_replay_invalid", str(exc)) from exc
+
     def _resolve_effective_lookahead_policy(self) -> LookaheadPolicyCallable:
         if self._installed_policy is None:
             raise ToolPayloadError(
@@ -485,6 +548,7 @@ class IterativeContextToolRuntime:
         symbol = _take_anchor_symbol(arguments)
         self._ensure_graph_ready()
         decision = self._resolve_anchor_decision(symbol)
+        self._graph_replay.observe_anchor_decision(decision)
         return self._resolve_payload_from_decision(symbol, decision)
 
     def _resolve_anchor_decision(self, symbol: str) -> AnchorDecision:
@@ -595,6 +659,7 @@ class IterativeContextToolRuntime:
         self._ensure_graph_ready()
 
         decision = self._resolve_anchor_decision(symbol)
+        self._graph_replay.observe_anchor_decision(decision)
         if (
             decision.status != "resolved"
             or decision.selected_anchor_id is None
@@ -607,10 +672,12 @@ class IterativeContextToolRuntime:
                 graph=_empty_expansion_graph(),
             )
 
+        self._graph_replay.note_expand_call()
         graph = exploration.expand(
             decision.selected_anchor_id,
             depth=budget,
             score_fn=lookahead_policy,
+            observer=self._graph_replay,
         )
         return self._resolve_payload_from_decision(
             symbol,
@@ -674,6 +741,15 @@ def _optional_str(
         raise ValueError(f"{key} must be a string")
     stripped = value.strip()
     return stripped or None
+
+
+def _optional_bool(
+    arguments: dict[str, Any], key: str, *, default: bool
+) -> bool:
+    value = arguments.get(key, default)
+    if isinstance(value, bool):
+        return value
+    raise ValueError(f"{key} must be a boolean")
 
 
 def _require_int(arguments: dict[str, Any], key: str) -> int:
@@ -769,6 +845,14 @@ def load_policy_callable(
     return _load_required_selection_callable(module, path, symbol)
 
 
+def load_resolve_policy_callable(
+    policy_path: str | Path, symbol: str = "resolve_policy"
+) -> ResolvePolicyCallable:
+    path = Path(policy_path).expanduser().resolve()
+    module = _load_policy_module(path)
+    return _load_required_behavior_callable(module, path, symbol)
+
+
 def _validate_callable_signature(
     candidate: Any,
     *,
@@ -822,6 +906,7 @@ async def install_policy(
     policy_path: str,
     policy_id: str,
     *,
+    interface_version: str = POLICY_INTERFACE_VERSION,
     resolve_policy_symbol: str = "resolve_policy",
     lookahead_policy_symbol: str = "lookahead_policy",
 ) -> dict[str, Any]:
@@ -829,18 +914,44 @@ async def install_policy(
         {
             "policy_path": policy_path,
             "policy_id": policy_id,
+            "interface_version": interface_version,
             "resolve_policy_symbol": resolve_policy_symbol,
             "lookahead_policy_symbol": lookahead_policy_symbol,
         }
     )
 
 
-async def verify_policy(policy_id: str) -> dict[str, Any]:
-    return _default_runtime.admin_verify_policy({"policy_id": policy_id})
+async def verify_policy(
+    policy_id: str,
+    *,
+    policy_sha: str | None = None,
+    interface_version: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"policy_id": policy_id}
+    if policy_sha is not None:
+        payload["policy_sha"] = policy_sha
+    if interface_version is not None:
+        payload["interface_version"] = interface_version
+    return _default_runtime.admin_verify_policy(payload)
 
 
 async def describe_policy() -> dict[str, Any]:
     return _default_runtime.admin_describe_policy()
+
+
+async def collect_graph_trace(
+    trace_id: str,
+    *,
+    metadata: dict[str, object] | None = None,
+    clear_after_collect: bool = True,
+) -> dict[str, Any]:
+    return _default_runtime.admin_collect_graph_trace(
+        {
+            "trace_id": trace_id,
+            "metadata": metadata,
+            "clear_after_collect": clear_after_collect,
+        }
+    )
 
 
 @server.list_tools()
@@ -879,6 +990,8 @@ __all__ = [
     "install_policy",
     "verify_policy",
     "describe_policy",
+    "collect_graph_trace",
     "load_policy_callable",
+    "load_resolve_policy_callable",
     "main",
 ]

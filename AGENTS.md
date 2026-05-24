@@ -84,6 +84,7 @@ Canonical admin tools:
 * `install_policy`
 * `verify_policy`
 * `describe_policy`
+* `collect_graph_trace`
 
 Evaluator-visible tools must not expose admin tools.
 
@@ -99,6 +100,8 @@ Keep this split clear:
 * traversal/frontier behavior = installed behavior policy
 
 `AnchorDecision` is the canonical structured output for fuzzy anchor behavior and future replay derivation.
+
+Graph replay collection is admin-only. Keep normal evaluator tool responses compact and return full replay payloads only from `collect_graph_trace`.
 
 ---
 
