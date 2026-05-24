@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol, cast
 
@@ -17,6 +19,7 @@ from iterative_context.graph_models import (
 GRAPH_REPLAY_KIND = "searchbench.graph_replay.v1"
 GRAPH_REPLAY_SOURCE = "iterative-context"
 DEFAULT_MAX_VISIBLE_PENDING = 4
+MAX_METADATA_STRING_LENGTH = 200
 
 
 @dataclass(frozen=True)
@@ -24,17 +27,25 @@ class FrontierCandidate:
     node_id: str
     label: str | None
     kind: str | None
-    score: float
-    rank: int
+    score: float | None = None
+    rank: int | None = None
+    edge_kind: str | None = None
+    source_id: str | None = None
     metadata: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
 class FrontierDecision:
     step: int
+    source_id: str | None
     candidates: list[FrontierCandidate]
-    selected_node_id: str
+    visible_candidate_ids: list[str]
+    selected_id: str | None
+    pruned_ids: list[str]
+    frontier_count: int
+    hidden_count: int
     reason: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 @dataclass
@@ -47,6 +58,10 @@ class GraphReplaySummary:
     anchor_ambiguous: int = 0
     anchor_not_found: int = 0
     visible_frontier_limit: int = DEFAULT_MAX_VISIBLE_PENDING
+    frontier_candidate_count: int = 0
+    hidden_candidate_count: int = 0
+    max_frontier_candidate_count: int = 0
+    max_hidden_candidate_count: int = 0
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -57,7 +72,12 @@ class GraphReplaySummary:
             "anchorResolved": self.anchor_resolved,
             "anchorAmbiguous": self.anchor_ambiguous,
             "anchorNotFound": self.anchor_not_found,
+            "visibleCandidateLimit": self.visible_frontier_limit,
             "visibleFrontierLimit": self.visible_frontier_limit,
+            "frontierCandidateCount": self.frontier_candidate_count,
+            "hiddenCandidateCount": self.hidden_candidate_count,
+            "maxFrontierCandidateCount": self.max_frontier_candidate_count,
+            "maxHiddenCandidateCount": self.max_hidden_candidate_count,
         }
 
 
@@ -157,6 +177,16 @@ def _node_from_frontier_candidate(candidate: FrontierCandidate, *, state: str) -
     )
 
 
+def _frontier_edge_payload(candidate: FrontierCandidate) -> dict[str, object] | None:
+    if candidate.source_id is None or candidate.edge_kind is None:
+        return None
+    return {
+        "source": candidate.source_id,
+        "target": candidate.node_id,
+        "kind": candidate.edge_kind,
+    }
+
+
 def _edge_payload(edge: GraphEdge) -> dict[str, object]:
     return _compact_dict(
         {
@@ -182,6 +212,7 @@ class GraphReplayRecorder:
             visible_frontier_limit=self.max_visible_pending,
         )
         self._iteration = 0
+        self._visible_pending_ids: list[str] = []
 
     def note_expand_call(self) -> None:
         self._summary.expand_calls += 1
@@ -238,6 +269,11 @@ class GraphReplayRecorder:
         current = dict(self._known_nodes[node_id])
         current.update(cleaned_patch)
         self._known_nodes[node_id] = current
+        state = cleaned_patch.get("state")
+        if state in {"resolved", "anchor", "pruned"}:
+            self._visible_pending_ids = [
+                visible_id for visible_id in self._visible_pending_ids if visible_id != node_id
+            ]
         event: dict[str, object] = {"type": "updateNode", "id": node_id, "patch": cleaned_patch}
         if reason is not None:
             event["reason"] = reason
@@ -304,6 +340,17 @@ class GraphReplayRecorder:
         self._summary.lookahead_steps += 1
         self._append_iteration(f"lookahead_step_{decision.step + 1}")
         visible = self._bounded_frontier_candidates(decision)
+        hidden_count = max(decision.hidden_count, decision.frontier_count - len(visible), 0)
+        self._summary.frontier_candidate_count = decision.frontier_count
+        self._summary.hidden_candidate_count = hidden_count
+        self._summary.max_frontier_candidate_count = max(
+            self._summary.max_frontier_candidate_count,
+            decision.frontier_count,
+        )
+        self._summary.max_hidden_candidate_count = max(
+            self._summary.max_hidden_candidate_count,
+            hidden_count,
+        )
         self.add_nodes(
             [
                 _node_from_frontier_candidate(candidate, state="pending")
@@ -311,9 +358,32 @@ class GraphReplayRecorder:
             ],
             reason="frontier_visible",
         )
+        self.add_edges(
+            [
+                edge_payload
+                for candidate in visible
+                for edge_payload in [_frontier_edge_payload(candidate)]
+                if edge_payload is not None
+                and edge_payload["source"] in self._known_nodes
+            ],
+            reason="frontier_visible",
+        )
+        for candidate in visible:
+            self._record_candidate_score(candidate)
+        for node_id in decision.pruned_ids:
+            if node_id in self._known_nodes or any(
+                candidate.node_id == node_id for candidate in visible
+            ):
+                self.prune_node(node_id, reason="frontier_pruned")
+        self._visible_pending_ids = [
+            candidate.node_id
+            for candidate in visible
+            if candidate.node_id not in set(decision.pruned_ids)
+            and self._known_nodes.get(candidate.node_id, {}).get("state")
+            not in {"resolved", "anchor", "pruned"}
+        ]
 
     def observe_expansion(self, source_id: str, events: list[GraphEvent], graph: Graph) -> None:
-        del source_id, graph
         for event in events:
             if isinstance(event, AddNodesEvent):
                 self.add_nodes(
@@ -328,10 +398,15 @@ class GraphReplayRecorder:
                 )
                 continue
             if isinstance(event, UpdateNodeEvent):
+                self._ensure_node_known(source_id if event.id == source_id else event.id, graph)
                 self.update_node(
                     event.id,
                     cast(dict[str, object], dict(event.patch)),
-                    reason="frontier_selected",
+                    reason=(
+                        "frontier_selected"
+                        if event.id == source_id and event.patch.get("state") == "resolved"
+                        else "frontier_updated"
+                    ),
                 )
                 continue
             iteration_event = event
@@ -410,18 +485,101 @@ class GraphReplayRecorder:
     def _bounded_frontier_candidates(
         self, decision: FrontierDecision
     ) -> list[FrontierCandidate]:
-        visible = list(decision.candidates[: self.max_visible_pending])
-        if any(candidate.node_id == decision.selected_node_id for candidate in visible):
-            return visible
-        for candidate in decision.candidates[self.max_visible_pending :]:
-            if candidate.node_id != decision.selected_node_id:
+        ordered = self._ordered_frontier_candidates(decision.candidates)
+        candidates_by_id = {candidate.node_id: candidate for candidate in ordered}
+        selected_ids = self._dedupe_ids(
+            [decision.selected_id] if decision.selected_id is not None else []
+        )
+        pruned_ids = self._dedupe_ids(
+            [
+                node_id
+                for node_id in decision.pruned_ids
+                if node_id in candidates_by_id and node_id not in selected_ids
+            ]
+        )
+        sticky_ids = self._dedupe_ids(
+            [
+                node_id
+                for node_id in self._visible_pending_ids
+                if node_id in candidates_by_id
+                and node_id not in selected_ids
+                and node_id not in pruned_ids
+            ]
+        )
+        requested_ids = self._dedupe_ids(
+            [
+                node_id
+                for node_id in decision.visible_candidate_ids
+                if node_id in candidates_by_id
+                and node_id not in selected_ids
+                and node_id not in pruned_ids
+            ]
+        )
+        ranked_ids = [
+            candidate.node_id
+            for candidate in ordered
+            if candidate.node_id not in selected_ids
+            and candidate.node_id not in pruned_ids
+            and candidate.node_id not in sticky_ids
+            and candidate.node_id not in requested_ids
+        ]
+
+        visible_ids = self._dedupe_ids(selected_ids + pruned_ids + sticky_ids)
+        for node_id in requested_ids + ranked_ids:
+            if len(visible_ids) >= self.max_visible_pending:
+                break
+            visible_ids.append(node_id)
+        return [candidates_by_id[node_id] for node_id in visible_ids if node_id in candidates_by_id]
+
+    def _ordered_frontier_candidates(
+        self, candidates: list[FrontierCandidate]
+    ) -> list[FrontierCandidate]:
+        return sorted(
+            candidates,
+            key=lambda candidate: (
+                candidate.rank if candidate.rank is not None else 10_000,
+                -(candidate.score if candidate.score is not None else float("-inf")),
+                candidate.node_id,
+            ),
+        )
+
+    def _record_candidate_score(self, candidate: FrontierCandidate) -> None:
+        patch: dict[str, object] = {}
+        if candidate.score is not None:
+            patch["score"] = candidate.score
+        if candidate.rank is not None:
+            patch["rank"] = candidate.rank
+        if patch:
+            self.update_node(candidate.node_id, patch, reason="candidate_scored")
+
+    def _ensure_node_known(self, node_id: str, graph: Graph) -> None:
+        if node_id in self._known_nodes:
+            return
+        raw = graph.nodes.get(node_id)
+        if not isinstance(raw, dict):
+            return
+        data = raw.get("data")
+        if (
+            data is None
+            or not hasattr(data, "id")
+            or not hasattr(data, "state")
+            or not hasattr(data, "kind")
+        ):
+            return
+        self.add_nodes([_normalize_node_dict(cast(GraphNode, data))], reason="frontier_visible")
+
+    def _dedupe_ids(self, node_ids: Sequence[str | None]) -> list[str]:
+        seen: set[str] = set()
+        result: list[str] = []
+        for raw in node_ids:
+            if raw is None:
                 continue
-            if visible:
-                visible[-1] = candidate
-            else:
-                visible.append(candidate)
-            break
-        return visible
+            node_id = raw.strip()
+            if not node_id or node_id in seen:
+                continue
+            seen.add(node_id)
+            result.append(node_id)
+        return result
 
     def _sanitize_metadata(self, metadata: object) -> dict[str, object]:
         if metadata is None:
@@ -433,8 +591,54 @@ class GraphReplayRecorder:
         for key, value in typed_metadata.items():
             if not isinstance(key, str):
                 continue
-            clean[key] = value
+            lowered_key = key.lower()
+            if lowered_key in {
+                "api_key",
+                "provider_key",
+                "secret",
+                "private_prompt",
+                "raw_prompt",
+                "source_snippet",
+                "env_vars",
+            }:
+                raise ValueError(f"metadata key {key!r} is not portable")
+            clean[key] = self._sanitize_metadata_value(value, path=key)
         return clean
+
+    def _sanitize_metadata_value(self, value: object, *, path: str) -> object:
+        if value is None or isinstance(value, (bool, int, float)):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return ""
+            if "\n" in stripped or "\r" in stripped:
+                raise ValueError(f"metadata field {path!r} must be single-line")
+            if len(stripped) > MAX_METADATA_STRING_LENGTH:
+                raise ValueError(f"metadata field {path!r} is too large")
+            if stripped.startswith(("/home/", "/Users/", "/tmp/")):
+                raise ValueError(f"metadata field {path!r} contains a non-portable path")
+            normalized = stripped.replace("\\", "/")
+            if "evidence/bundle/" in normalized or "/projection/" in normalized:
+                raise ValueError(f"metadata field {path!r} contains a bundle/projection path")
+            if stripped.startswith("sk-") or re.match(r"^[A-Z_][A-Z0-9_]*=.*", stripped):
+                raise ValueError(f"metadata field {path!r} contains secret-like content")
+            return stripped
+        if isinstance(value, list):
+            typed_items = cast(list[object], value)
+            return [
+                self._sanitize_metadata_value(item, path=f"{path}[{index}]")
+                for index, item in enumerate(typed_items)
+            ]
+        if isinstance(value, dict):
+            clean: dict[str, object] = {}
+            typed_value = cast(dict[object, object], value)
+            for key, nested in typed_value.items():
+                if not isinstance(key, str):
+                    continue
+                clean[key] = self._sanitize_metadata_value(nested, path=f"{path}.{key}")
+            return clean
+        raise ValueError(f"metadata field {path!r} uses unsupported type {type(value).__name__}")
 
     def _optional_string(self, metadata: object, key: str) -> str | None:
         if not isinstance(metadata, dict):

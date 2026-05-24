@@ -60,7 +60,20 @@ The current default is:
 
 - `maxVisiblePending = 4`
 
-Visible non-selected anchor candidates may be explicitly pruned. Hidden candidates stay out of the emitted graph until they become visible.
+Visible frontier selection is deliberate:
+
+- always include the selected lookahead candidate when one exists
+- include explicitly pruned candidates when the replay budget allows
+- prefer sticky already-visible pending candidates before introducing new ones
+- fill remaining slots by rank
+- if a hidden candidate is later selected, emit it as `pending` before it becomes `resolved`
+
+Visible non-selected anchor candidates may be explicitly pruned after a resolved `AnchorDecision`.
+Lookahead candidates stay pending unless the traversal explicitly prunes them.
+Hidden candidates stay out of the emitted graph until they become visible.
+
+Compact score/rank evidence is attached through `updateNode` patches with replay reasons such as `candidate_scored`.
+Expansion causality is preserved through emitted `addEdges` records from the selected or discovered parent node to newly visible or discovered children.
 
 ## Trace isolation
 

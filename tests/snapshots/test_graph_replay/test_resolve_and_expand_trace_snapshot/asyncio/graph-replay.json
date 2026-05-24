@@ -50,6 +50,33 @@
       "type": "addNodes"
     },
     {
+      "id": "C",
+      "patch": {
+        "rank": 1,
+        "score": 7.0
+      },
+      "reason": "candidate_scored",
+      "type": "updateNode"
+    },
+    {
+      "id": "B",
+      "patch": {
+        "rank": 2,
+        "score": 7.0
+      },
+      "reason": "candidate_scored",
+      "type": "updateNode"
+    },
+    {
+      "id": "A",
+      "patch": {
+        "rank": 3,
+        "score": 7.0
+      },
+      "reason": "candidate_scored",
+      "type": "updateNode"
+    },
+    {
       "nodes": [
         {
           "id": "C_child",
@@ -84,6 +111,33 @@
       "description": "lookahead_step_2",
       "step": 3,
       "type": "iteration"
+    },
+    {
+      "id": "C_child",
+      "patch": {
+        "rank": 1,
+        "score": 7.0
+      },
+      "reason": "candidate_scored",
+      "type": "updateNode"
+    },
+    {
+      "id": "B",
+      "patch": {
+        "rank": 2,
+        "score": 7.0
+      },
+      "reason": "candidate_scored",
+      "type": "updateNode"
+    },
+    {
+      "id": "A",
+      "patch": {
+        "rank": 3,
+        "score": 7.0
+      },
+      "reason": "candidate_scored",
+      "type": "updateNode"
     },
     {
       "nodes": [
@@ -129,10 +183,15 @@
     "anchorAmbiguous": 0,
     "anchorNotFound": 0,
     "anchorResolved": 1,
-    "eventCount": 12,
+    "eventCount": 18,
     "expandCalls": 1,
+    "frontierCandidateCount": 3,
+    "hiddenCandidateCount": 0,
     "lookaheadSteps": 2,
+    "maxFrontierCandidateCount": 3,
+    "maxHiddenCandidateCount": 0,
     "resolveCalls": 1,
+    "visibleCandidateLimit": 4,
     "visibleFrontierLimit": 4
   },
   "traceId": "round-001/match-a/challenger/attempt-001"

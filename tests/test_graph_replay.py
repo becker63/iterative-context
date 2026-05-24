@@ -11,7 +11,14 @@ from pytest_snapshot.plugin import Snapshot
 
 from iterative_context import exploration, server
 from iterative_context.exploration import _repo_signature, _set_active_graph
-from iterative_context.graph_models import AddNodesEvent, Graph, PendingNode, UpdateNodeEvent
+from iterative_context.graph_models import (
+    AddEdgesEvent,
+    AddNodesEvent,
+    Graph,
+    GraphEdge,
+    PendingNode,
+    UpdateNodeEvent,
+)
 from iterative_context.graph_replay import (
     FrontierCandidate,
     FrontierDecision,
@@ -150,6 +157,35 @@ async def _collect(
     return cast(dict[str, Any], json.loads(response[0].text))
 
 
+def _frontier_candidate(
+    node_id: str,
+    *,
+    label: str | None = None,
+    score: float | None = None,
+    rank: int | None = None,
+    source: tuple[str, str] | None = None,
+) -> FrontierCandidate:
+    source_id = source[0] if source is not None else None
+    edge_kind = source[1] if source is not None else None
+    return FrontierCandidate(
+        node_id=node_id,
+        label=label or node_id.lower(),
+        kind="symbol",
+        score=score,
+        rank=rank,
+        source_id=source_id,
+        edge_kind=edge_kind,
+    )
+
+
+def _payload_events(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    return cast(list[dict[str, Any]], payload["events"])
+
+
+def _payload_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    return cast(dict[str, Any], payload["summary"])
+
+
 @pytest.mark.anyio
 async def test_collect_graph_trace_empty_trace_valid(tmp_path: Path) -> None:
     runtime = await _install_test_policy(tmp_path, runtime=IterativeContextToolRuntime())
@@ -224,8 +260,9 @@ async def test_collect_graph_trace_ambiguous_does_not_fabricate_selected_anchor(
     await runtime.call_tool("resolve", {"query": "fetch_user"})
     payload = await _collect(runtime)
 
-    node_events = [event for event in payload["events"] if event["type"] == "addNodes"]
-    update_events = [event for event in payload["events"] if event["type"] == "updateNode"]
+    events = _payload_events(payload)
+    node_events = [event for event in events if event["type"] == "addNodes"]
+    update_events = [event for event in events if event["type"] == "updateNode"]
     assert node_events
     assert all(event["patch"].get("state") != "anchor" for event in update_events)
 
@@ -239,7 +276,7 @@ async def test_collect_graph_trace_not_found_has_no_anchor_nodes(tmp_path: Path)
     payload = await _collect(runtime)
 
     assert payload["summary"]["anchorNotFound"] == 1
-    assert all(event["type"] != "addNodes" for event in payload["events"])
+    assert all(event["type"] != "addNodes" for event in _payload_events(payload))
 
 
 @pytest.mark.anyio
@@ -300,11 +337,16 @@ def test_frontier_recorder_adds_hidden_selected_candidate_before_resolved() -> N
         FrontierDecision(
             step=0,
             candidates=[
-                FrontierCandidate("A", "alpha", "symbol", 5.0, 1),
-                FrontierCandidate("B", "beta", "symbol", 4.0, 2),
-                FrontierCandidate("C", "charlie", "symbol", 3.0, 3),
+                _frontier_candidate("A", label="alpha", score=5.0, rank=1),
+                _frontier_candidate("B", label="beta", score=4.0, rank=2),
+                _frontier_candidate("C", label="charlie", score=3.0, rank=3),
             ],
-            selected_node_id="C",
+            source_id=None,
+            visible_candidate_ids=[],
+            selected_id="C",
+            pruned_ids=[],
+            frontier_count=3,
+            hidden_count=1,
         )
     )
     recorder.observe_expansion(
@@ -320,11 +362,114 @@ def test_frontier_recorder_adds_hidden_selected_candidate_before_resolved() -> N
         clear_after_collect=False,
     )
 
-    add_nodes = next(event for event in payload["events"] if event["type"] == "addNodes")
-    update = next(event for event in payload["events"] if event["type"] == "updateNode")
-    assert [node["id"] for node in add_nodes["nodes"]] == ["A", "C"]
-    assert update["id"] == "C"
-    assert update["patch"]["state"] == "resolved"
+    events = _payload_events(payload)
+    add_nodes = next(
+        event
+        for event in events
+        if event["type"] == "addNodes"
+        and any(node["id"] == "C" for node in event["nodes"])
+    )
+    selected_updates = [
+        event
+        for event in events
+        if event["type"] == "updateNode" and event["id"] == "C"
+    ]
+    assert any(node["id"] == "C" and node["state"] == "pending" for node in add_nodes["nodes"])
+    assert any(
+        event["patch"].get("state") == "resolved"
+        for event in selected_updates
+    )
+    assert events.index(add_nodes) < events.index(selected_updates[-1])
+    summary = _payload_summary(payload)
+    assert summary["frontierCandidateCount"] == 3
+    assert summary["hiddenCandidateCount"] == 1
+
+
+def test_frontier_recorder_bounds_visible_frontier_to_default_limit() -> None:
+    recorder = GraphReplayRecorder()
+    recorder.observe_frontier_decision(
+        FrontierDecision(
+            step=0,
+            source_id=None,
+            candidates=[
+                _frontier_candidate("A", score=10.0, rank=1),
+                _frontier_candidate("B", score=9.0, rank=2),
+                _frontier_candidate("C", score=8.0, rank=3),
+                _frontier_candidate("D", score=7.0, rank=4),
+                _frontier_candidate("E", score=6.0, rank=5),
+                _frontier_candidate("F", score=5.0, rank=6),
+            ],
+            visible_candidate_ids=[],
+            selected_id="F",
+            pruned_ids=[],
+            frontier_count=6,
+            hidden_count=2,
+        )
+    )
+    payload = recorder.collect(
+        trace_id="trace-001b",
+        metadata={},
+        policy_id="policy-v1",
+        clear_after_collect=False,
+    )
+
+    events = _payload_events(payload)
+    add_nodes = next(event for event in events if event["type"] == "addNodes")
+    node_ids = [node["id"] for node in add_nodes["nodes"]]
+    summary = _payload_summary(payload)
+    assert len(node_ids) == 4
+    assert "F" in node_ids
+    assert summary["visibleCandidateLimit"] == 4
+    assert summary["frontierCandidateCount"] == 6
+    assert summary["hiddenCandidateCount"] == 2
+    assert all(
+        event["patch"].get("state") != "pruned"
+        for event in events
+        if event["type"] == "updateNode"
+    )
+
+
+def test_non_selected_visible_frontier_candidates_remain_pending() -> None:
+    recorder = GraphReplayRecorder(max_visible_pending=2)
+    recorder.observe_frontier_decision(
+        FrontierDecision(
+            step=0,
+            source_id=None,
+            candidates=[
+                _frontier_candidate("A", score=10.0, rank=1),
+                _frontier_candidate("B", score=9.0, rank=2),
+                _frontier_candidate("C", score=8.0, rank=3),
+            ],
+            visible_candidate_ids=[],
+            selected_id="A",
+            pruned_ids=[],
+            frontier_count=3,
+            hidden_count=1,
+        )
+    )
+    recorder.observe_expansion(
+        "A",
+        [UpdateNodeEvent(id="A", patch={"state": "resolved", "tokens": 1})],
+        build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}]}),
+    )
+    payload = recorder.collect(
+        trace_id="trace-001c",
+        metadata={},
+        policy_id="policy-v1",
+        clear_after_collect=False,
+    )
+
+    events = _payload_events(payload)
+    assert any(
+        event["type"] == "addNodes" and any(node["id"] == "B" for node in event["nodes"])
+        for event in events
+    )
+    assert not any(
+        event["type"] == "updateNode"
+        and event["id"] == "B"
+        and event["patch"].get("state") in {"resolved", "pruned"}
+        for event in events
+    )
 
 
 def test_recorder_prune_node_emits_pruned_update() -> None:
@@ -343,9 +488,91 @@ def test_recorder_prune_node_emits_pruned_update() -> None:
         clear_after_collect=False,
     )
 
-    updates = [event for event in payload["events"] if event["type"] == "updateNode"]
+    updates = [event for event in _payload_events(payload) if event["type"] == "updateNode"]
     assert len(updates) == 1
     assert updates[0]["patch"]["state"] == "pruned"
+
+
+def test_frontier_decision_explicit_prune_emits_pruned_update() -> None:
+    recorder = GraphReplayRecorder(max_visible_pending=3)
+    recorder.observe_frontier_decision(
+        FrontierDecision(
+            step=0,
+            source_id=None,
+            candidates=[
+                _frontier_candidate("A", score=10.0, rank=1),
+                _frontier_candidate("B", score=9.0, rank=2),
+                _frontier_candidate("C", score=8.0, rank=3),
+            ],
+            visible_candidate_ids=[],
+            selected_id="A",
+            pruned_ids=["B"],
+            frontier_count=3,
+            hidden_count=0,
+        )
+    )
+    payload = recorder.collect(
+        trace_id="trace-002b",
+        metadata={},
+        policy_id="policy-v1",
+        clear_after_collect=False,
+    )
+
+    events = _payload_events(payload)
+    assert any(
+        event["type"] == "updateNode"
+        and event["id"] == "B"
+        and event["patch"].get("state") == "pruned"
+        and event.get("reason") == "frontier_pruned"
+        for event in events
+    )
+
+
+def test_frontier_decision_emits_compact_score_rank_and_source_causality() -> None:
+    recorder = GraphReplayRecorder(max_visible_pending=2)
+    recorder.add_nodes(
+        [{"id": "root", "kind": "symbol", "state": "resolved", "label": "root"}],
+        reason="selected_anchor",
+    )
+    recorder.observe_frontier_decision(
+        FrontierDecision(
+            step=0,
+            source_id="root",
+            candidates=[
+                _frontier_candidate(
+                    "child",
+                    label="child",
+                    score=0.73,
+                    rank=1,
+                    source=("root", "calls"),
+                ),
+                _frontier_candidate("other", label="other", score=0.41, rank=2),
+            ],
+            visible_candidate_ids=[],
+            selected_id="child",
+            pruned_ids=[],
+            frontier_count=2,
+            hidden_count=0,
+        )
+    )
+    payload = recorder.collect(
+        trace_id="trace-002c",
+        metadata={},
+        policy_id="policy-v1",
+        clear_after_collect=False,
+    )
+
+    events = _payload_events(payload)
+    score_update = next(
+        event
+        for event in events
+        if event["type"] == "updateNode"
+        and event["id"] == "child"
+        and event.get("reason") == "candidate_scored"
+    )
+    edge_event = next(event for event in events if event["type"] == "addEdges")
+    assert score_update["patch"] == {"score": 0.73, "rank": 1}
+    assert edge_event["edges"] == [{"source": "root", "target": "child", "kind": "calls"}]
 
 
 def test_observe_expansion_emits_discovered_nodes_and_edges() -> None:
@@ -369,5 +596,66 @@ def test_observe_expansion_emits_discovered_nodes_and_edges() -> None:
         clear_after_collect=False,
     )
 
-    add_nodes = [event for event in payload["events"] if event["type"] == "addNodes"]
+    add_nodes = [event for event in _payload_events(payload) if event["type"] == "addNodes"]
     assert any(node["id"] == "A_child" for event in add_nodes for node in event["nodes"])
+
+
+def test_observe_expansion_preserves_discovered_source_edges() -> None:
+    recorder = GraphReplayRecorder()
+    graph = build_graph({"nodes": [{"id": "A", "kind": "symbol", "state": "pending"}]})
+    recorder.add_nodes(
+        [{"id": "A", "kind": "symbol", "state": "pending"}],
+        reason="frontier_visible",
+    )
+    recorder.observe_expansion(
+        "A",
+        [
+            AddNodesEvent(nodes=[PendingNode(id="A_child", kind="symbol")]),
+            AddEdgesEvent(edges=[GraphEdge(source="A", target="A_child", kind="calls")]),
+        ],
+        graph,
+    )
+    payload = recorder.collect(
+        trace_id="trace-003b",
+        metadata={},
+        policy_id="policy-v1",
+        clear_after_collect=False,
+    )
+
+    add_edges = [event for event in _payload_events(payload) if event["type"] == "addEdges"]
+    assert any(
+        edge == {"source": "A", "target": "A_child", "kind": "calls"}
+        for event in add_edges
+        for edge in event["edges"]
+    )
+
+
+@pytest.mark.anyio
+async def test_collect_graph_trace_does_not_emit_set_context_without_real_context(
+    tmp_path: Path,
+) -> None:
+    _activate_graph_with_symbols()
+    runtime = await _install_test_policy(tmp_path, runtime=IterativeContextToolRuntime())
+
+    await runtime.call_tool("resolve_and_expand", {"symbol": "expand_node", "depth": 2})
+    payload = await _collect(runtime)
+
+    assert all(event["type"] != "setContext" for event in _payload_events(payload))
+
+
+@pytest.mark.anyio
+async def test_collect_graph_trace_rejects_non_portable_metadata_paths(
+    tmp_path: Path,
+) -> None:
+    runtime = await _install_test_policy(tmp_path, runtime=IterativeContextToolRuntime())
+
+    response = await runtime.call_tool(
+        "collect_graph_trace",
+        {
+            "trace_id": "round-001/match-a/challenger/attempt-001",
+            "metadata": {"bundle_path": "configs/round/evidence/bundle/game-001/report.json"},
+        },
+    )
+    payload = cast(dict[str, Any], json.loads(response[0].text))
+
+    assert payload["error_code"] == "graph_replay_invalid"

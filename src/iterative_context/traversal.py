@@ -86,18 +86,32 @@ def run_traversal(
         candidates = get_frontier(graph)
         if not candidates:
             break
-        node = select_next_node(candidates, graph, step, policy_wrapper.score)
+        ranked_candidates = _rank_frontier_candidates(
+            candidates,
+            graph,
+            step,
+            policy_wrapper.score,
+        )
+        graph.graph["last_scores"] = [
+            {"id": candidate.node_id, "score": candidate.score, "rank": candidate.rank}
+            for candidate in ranked_candidates
+        ]
+        node = next(
+            candidate
+            for candidate in candidates
+            if candidate.id == ranked_candidates[0].node_id
+        )
         if observer is not None:
             observer.observe_frontier_decision(
                 FrontierDecision(
                     step=step,
-                    candidates=_rank_frontier_candidates(
-                        candidates,
-                        graph,
-                        step,
-                        policy_wrapper.score,
-                    ),
-                    selected_node_id=node.id,
+                    source_id=None,
+                    candidates=ranked_candidates,
+                    visible_candidate_ids=[],
+                    selected_id=node.id,
+                    pruned_ids=[],
+                    frontier_count=len(ranked_candidates),
+                    hidden_count=0,
                 )
             )
         score_history.append(graph.graph.get("last_scores", []))
@@ -120,6 +134,8 @@ def _rank_frontier_candidates(
         raw = cast(object, graph.nodes.get(node.id))
         label = getattr(node, "label", None)
         metadata: dict[str, object] = {}
+        source_id: str | None = None
+        edge_kind: str | None = None
         if isinstance(raw, dict):
             typed_raw = cast(dict[str, object], raw)
             symbol_value = typed_raw.get("symbol")
@@ -127,9 +143,7 @@ def _rank_frontier_candidates(
                 label = symbol_value
             if isinstance(symbol_value, str):
                 metadata["symbol"] = symbol_value
-            file_value = typed_raw.get("file")
-            if isinstance(file_value, str):
-                metadata["file"] = file_value
+        source_id, edge_kind = _candidate_source(node.id, graph)
         scored.append(
             FrontierCandidate(
                 node_id=node.id,
@@ -137,6 +151,8 @@ def _rank_frontier_candidates(
                 kind=node.kind,
                 score=score_fn(node, graph, step),
                 rank=0,
+                edge_kind=edge_kind,
+                source_id=source_id,
                 metadata=metadata or None,
             )
         )
@@ -156,6 +172,36 @@ def _rank_frontier_candidates(
         )
         for index, candidate in enumerate(ordered, start=1)
     ]
+
+
+def _candidate_source(
+    node_id: str,
+    graph: Graph,
+) -> tuple[str | None, str | None]:
+    edges: list[tuple[str, str | None, int]] = []
+    for source, _, raw in graph.in_edges(node_id, data=True):
+        edge_kind: str | None = None
+        typed_raw = cast(dict[str, object], raw)
+        embedded = typed_raw.get("data")
+        if hasattr(embedded, "kind"):
+            edge_kind = cast(str | None, getattr(embedded, "kind", None))
+        raw_kind = typed_raw.get("kind")
+        if edge_kind is None and isinstance(raw_kind, str):
+            edge_kind = raw_kind
+        source_id = cast(str, source)
+        source_data = cast(dict[str, object], graph.nodes.get(source_id, {}))
+        source_state_rank = 2
+        node_data = source_data.get("data")
+        state = getattr(node_data, "state", None)
+        if state == "resolved":
+            source_state_rank = 0
+        elif state == "anchor":
+            source_state_rank = 1
+        edges.append((source_id, edge_kind, source_state_rank))
+    if not edges:
+        return None, None
+    best_source, best_kind, _ = min(edges, key=lambda item: (item[2], item[0]))
+    return best_source, best_kind
 
 
 __all__ = [
