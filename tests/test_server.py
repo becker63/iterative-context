@@ -619,12 +619,17 @@ async def test_runtimes_isolate_repos(two_repos: tuple[Path, Path], tmp_path: Pa
 
     graph_a = json.loads(expand_a[0].text)["graph"]
     graph_b = json.loads(expand_b[0].text)["graph"]
+    full_a = json.loads(expand_a[0].text)["full_graph"]
+    full_b = json.loads(expand_b[0].text)["full_graph"]
 
     symbols_a = {n["symbol"] for n in graph_a["nodes"]}
     symbols_b = {n["symbol"] for n in graph_b["nodes"]}
 
     assert symbols_a == {"alpha_symbol"}
     assert symbols_b == {"beta_symbol"}
+    assert full_a["metadata"]["graphSignature"] != full_b["metadata"]["graphSignature"]
+    assert full_a["metadata"]["repoIdentity"]["repoRoot"].endswith("repo_a")
+    assert full_b["metadata"]["repoIdentity"]["repoRoot"].endswith("repo_b")
 
 
 @pytest.mark.anyio

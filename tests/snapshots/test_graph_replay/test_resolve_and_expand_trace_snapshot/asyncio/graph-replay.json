@@ -187,6 +187,12 @@
       "type": "updateNode"
     }
   ],
+  "graphBuilder": {
+    "name": "iterative-context",
+    "normalizationVersion": "iterative-context.normalize.v1",
+    "version": "iterative-context.graph-builder.v1"
+  },
+  "graphSignature": "sha256:f2fc0825dd7d4b97c75133a0c979903b4c18623e8b3d7a5177393403d453111f",
   "kind": "searchbench.graph_replay.v1",
   "matchId": "match-a",
   "metadata": {
@@ -195,6 +201,7 @@
   "policyId": "policy-v1",
   "role": "challenger",
   "source": "iterative-context",
+  "sourceSignature": "sha256:568cd5d0cca522cfb309b9ac91639d6eb135480eea88e028faceac2885790d3c",
   "summary": {
     "anchorAmbiguous": 0,
     "anchorNotFound": 0,

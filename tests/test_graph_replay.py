@@ -25,6 +25,7 @@ from iterative_context.graph_replay import (
     FrontierDecision,
     GraphReplayRecorder,
 )
+from iterative_context.graph_session import compute_source_signature
 from iterative_context.server import IterativeContextToolRuntime
 from iterative_context.test_helpers.graph_dsl import build_graph
 from iterative_context.traversal import run_traversal
@@ -62,6 +63,20 @@ def _make_graph_with_symbols() -> Graph:
     graph.nodes["C"]["symbol"] = "fetch_user_data"
     graph.nodes["D"]["symbol"] = "fetch_user_info"
     graph.nodes["E"]["symbol"] = "fuzzy_target"
+    return graph
+
+
+def _make_single_symbol_graph(node_id: str, symbol: str) -> Graph:
+    graph = build_graph(
+        {
+            "nodes": [
+                {"id": node_id, "kind": "symbol", "state": "pending"},
+            ],
+            "edges": [],
+        }
+    )
+    graph.nodes[node_id]["symbol"] = symbol
+    graph.nodes[node_id]["file"] = f"src/{symbol}.py"
     return graph
 
 
@@ -232,6 +247,43 @@ async def test_collect_graph_trace_clear_false_is_idempotent(tmp_path: Path) -> 
 
     assert first["events"] == second["events"]
     assert first["summary"] == second["summary"]
+
+
+@pytest.mark.anyio
+async def test_collect_graph_trace_clear_after_collect_is_runtime_local(tmp_path: Path) -> None:
+    runtime_a = await _install_test_policy(tmp_path / "policy_a", runtime=IterativeContextToolRuntime())
+    runtime_b = await _install_test_policy(tmp_path / "policy_b", runtime=IterativeContextToolRuntime())
+    repo_a = tmp_path / "repo_a"
+    repo_b = tmp_path / "repo_b"
+    repo_a.mkdir(parents=True, exist_ok=True)
+    repo_b.mkdir(parents=True, exist_ok=True)
+    (repo_a / "alpha_symbol.py").write_text("def alpha_symbol():\n    return 'a'\n", encoding="utf-8")
+    (repo_b / "beta_symbol.py").write_text("def beta_symbol():\n    return 'b'\n", encoding="utf-8")
+    runtime_a._graph_session.set_graph(  # pyright: ignore[reportPrivateUsage]
+        _make_single_symbol_graph("A", "alpha_symbol"),
+        repo_root=repo_a,
+        source_signature=compute_source_signature(repo_a),
+    )
+    runtime_b._graph_session.set_graph(  # pyright: ignore[reportPrivateUsage]
+        _make_single_symbol_graph("B", "beta_symbol"),
+        repo_root=repo_b,
+        source_signature=compute_source_signature(repo_b),
+    )
+
+    first = await runtime_a.call_tool("resolve", {"symbol": "alpha_symbol"})
+    second = await runtime_b.call_tool("resolve", {"symbol": "beta_symbol"})
+    assert "error" not in json.loads(first[0].text)
+    assert "error" not in json.loads(second[0].text)
+
+    collected_a = await _collect(runtime_a, trace_id="trace-a", clear_after_collect=True)
+    collected_b = await _collect(runtime_b, trace_id="trace-b", clear_after_collect=False)
+    cleared_a = await _collect(runtime_a, trace_id="trace-a")
+
+    assert collected_a["summary"]["eventCount"] > 0
+    assert collected_b["summary"]["eventCount"] > 0
+    assert collected_a["graphSignature"] != collected_b["graphSignature"]
+    assert collected_a["sourceSignature"] != collected_b["sourceSignature"]
+    assert cleared_a["summary"]["eventCount"] == 0
 
 
 @pytest.mark.anyio
@@ -706,6 +758,24 @@ async def test_collect_graph_trace_rejects_non_portable_metadata_paths(
         {
             "trace_id": "round-001/match-a/challenger/attempt-001",
             "metadata": {"bundle_path": "configs/round/evidence/bundle/game-001/report.json"},
+        },
+    )
+    payload = cast(dict[str, Any], json.loads(response[0].text))
+
+    assert payload["error_code"] == "graph_replay_invalid"
+
+
+@pytest.mark.anyio
+async def test_collect_graph_trace_rejects_spoofed_graph_identity_metadata(
+    tmp_path: Path,
+) -> None:
+    runtime = await _install_test_policy(tmp_path, runtime=IterativeContextToolRuntime())
+
+    response = await runtime.call_tool(
+        "collect_graph_trace",
+        {
+            "trace_id": "round-001/match-a/challenger/attempt-001",
+            "metadata": {"graphSignature": "sha256:spoofed"},
         },
     )
     payload = cast(dict[str, Any], json.loads(response[0].text))

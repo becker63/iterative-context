@@ -10,6 +10,13 @@ from tldr.ast_extractor import (  # type: ignore[reportMissingTypeStubs]
     ModuleInfo,
 )
 
+from iterative_context.path_ids import (
+    file_node_id,
+    function_node_id,
+    module_node_id,
+    repo_relative_path,
+    symbol_node_id,
+)
 from iterative_context.raw_tree import RawEdge, RawFile, RawFunction, RawTree
 
 Extracted = ModuleInfo | Mapping[str, object]
@@ -110,6 +117,7 @@ def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
     for py_file in root.rglob("*.py"):
         if ".venv" in str(py_file) or "__pycache__" in str(py_file):
             continue
+        rel_path = repo_relative_path(py_file, root)
 
         try:
             extracted: Extracted = extract_file(str(py_file))  # type: ignore[assignment]
@@ -128,13 +136,13 @@ def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
             if not isinstance(name, str) or not name:
                 continue
 
-            qualified_name = f"{py_file}:{name}"
+            qualified_name = function_node_id(rel_path, name, root)
 
             functions.append(
                 RawFunction(
                     id=qualified_name,
                     name=name,
-                    file=str(py_file),
+                    file=rel_path,
                 )
             )
 
@@ -142,7 +150,7 @@ def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
                 edges.append(
                     RawEdge(
                         source=qualified_name,
-                        target=called,
+                        target=symbol_node_id(called),
                         kind="call",
                     )
                 )
@@ -150,8 +158,8 @@ def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
         for src, target in _iter_call_graph_edges(extracted):
             edges.append(
                 RawEdge(
-                    source=f"{py_file}:{src}",
-                    target=target,
+                    source=function_node_id(rel_path, src, root),
+                    target=symbol_node_id(target),
                     kind="call",
                 )
             )
@@ -176,15 +184,15 @@ def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
                 imports.append(module)
                 edges.append(
                     RawEdge(
-                        source=str(py_file),
-                        target=module,
+                        source=file_node_id(rel_path, root),
+                        target=module_node_id(module),
                         kind="import",
                     )
                 )
 
         files.append(
             RawFile(
-                path=str(py_file),
+                path=rel_path,
                 functions=functions,
                 imports=imports,
                 edges=edges,

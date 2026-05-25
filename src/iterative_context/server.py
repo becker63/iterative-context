@@ -28,6 +28,7 @@ from iterative_context.graph_models import GraphNode
 from iterative_context.graph_replay import (
     GraphReplayRecorder,
 )
+from iterative_context.graph_session import GraphSession
 from iterative_context.serialization import serialize_graph_summary, serialize_node
 from iterative_context.types import (
     LookaheadPolicyCallable,
@@ -79,13 +80,8 @@ class InstalledPolicy:
         return payload
 
 
-def _serialize_resolved_node(node: GraphNode) -> dict[str, Any]:
-    graph = exploration.get_active_graph()
-    extras: dict[str, Any] = {}
-    if graph is not None and node.id in graph.nodes:
-        raw = graph.nodes[node.id]
-        extras = {k: v for k, v in raw.items() if k != "data"}
-    return serialize_node(node, extras)
+def _serialize_resolved_node(node: GraphNode, session: GraphSession) -> dict[str, Any]:
+    return serialize_node(node, session.node_extras(node.id))
 
 
 def _serialize_candidate(candidate: AnchorCandidate) -> dict[str, object]:
@@ -108,11 +104,8 @@ def _empty_expansion_graph() -> dict[str, Any]:
     return {"nodes": [], "edges": [], "metadata": {}}
 
 
-def _serialize_active_graph() -> dict[str, Any]:
-    graph = exploration.get_active_graph()
-    metadata: dict[str, Any] = {"source": "active_graph"}
-    metadata.update(exploration.get_active_repo_metadata())
-    return serialize_graph_summary(graph, metadata=metadata)
+def _serialize_session_graph(session: GraphSession) -> dict[str, Any]:
+    return serialize_graph_summary(session.graph, metadata=session.repo_metadata())
 
 
 def _tool_definitions() -> list[Tool]:
@@ -286,10 +279,17 @@ def _as_text_content(payload: dict[str, Any]) -> TextContent:
 class IterativeContextToolRuntime:
     """In-process MCP-compatible runtime for the IC MCP surface."""
 
-    def __init__(self, repo_root: str | Path | None = None):
-        self._repo_root = Path(repo_root).resolve() if repo_root is not None else None
+    def __init__(
+        self,
+        repo_root: str | Path | None = None,
+        *,
+        graph_session: GraphSession | None = None,
+    ):
         self._installed_policy: InstalledPolicy | None = None
         self._graph_replay = GraphReplayRecorder()
+        self._graph_session = graph_session or GraphSession(
+            repo_root=Path(repo_root).resolve() if repo_root is not None else None
+        )
 
     async def list_tools(self) -> list[Tool]:
         return _tool_definitions()
@@ -330,7 +330,7 @@ class IterativeContextToolRuntime:
             depth = _require_int(arguments, "depth")
             self._ensure_graph_ready()
             self._graph_replay.note_expand_call()
-            graph = exploration.expand(
+            graph = self._graph_session.expand(
                 node_id=node_id,
                 depth=depth,
                 score_fn=lookahead_policy,
@@ -338,7 +338,7 @@ class IterativeContextToolRuntime:
             )
             return {
                 "graph": graph,
-                "full_graph": _serialize_active_graph(),
+                "full_graph": _serialize_session_graph(self._graph_session),
                 **self._policy_payload_fields(),
             }
 
@@ -350,7 +350,14 @@ class IterativeContextToolRuntime:
         return {"error": f"Unknown tool: {name}"}
 
     def _ensure_graph_ready(self) -> None:
-        exploration.ensure_graph_loaded(repo_root=self._repo_root)
+        if (
+            self._graph_session.graph is None
+            and self._graph_session.repo_root is None
+            and exploration.get_active_graph() is not None
+        ):
+            self._graph_session.copy_loaded_state_from(exploration.get_default_session())
+            return
+        self._graph_session.ensure_loaded()
 
     def _ensure_policy_ready_for_evaluator(self) -> None:
         if self._installed_policy is None:
@@ -361,6 +368,10 @@ class IterativeContextToolRuntime:
 
     def clear_policy_install(self) -> None:
         self._installed_policy = None
+        self._graph_replay.reset()
+
+    def reset_graph_session(self) -> None:
+        self._graph_session.reset(clear_repo_root=False)
         self._graph_replay.reset()
 
     def _policy_payload_fields(self) -> dict[str, object]:
@@ -525,6 +536,13 @@ class IterativeContextToolRuntime:
                 trace_id=trace_id,
                 metadata=cast(dict[str, object] | None, metadata),
                 policy_id=self._installed_policy.policy_id if self._installed_policy else None,
+                source_signature=self._graph_session.source_signature,
+                graph_signature=self._graph_session.graph_signature,
+                graph_builder={
+                    "name": "iterative-context",
+                    "version": self._graph_session.graph_builder_id,
+                    "normalizationVersion": self._graph_session.normalization_version,
+                },
                 clear_after_collect=clear_after_collect,
             )
         except ValueError as exc:
@@ -553,10 +571,7 @@ class IterativeContextToolRuntime:
 
     def _resolve_anchor_decision(self, symbol: str) -> AnchorDecision:
         self._ensure_graph_ready()
-        store = exploration.get_active_store()
-        candidates = (
-            [] if store is None else store.collect_anchor_candidates(symbol, limit=8)
-        )
+        candidates = self._graph_session.collect_anchor_candidates(symbol, limit=8)
         state = self._resolve_policy_state(symbol, candidates)
         if self._installed_policy is None or self._installed_policy.resolve_policy is None:
             raise ToolPayloadError(
@@ -594,7 +609,7 @@ class IterativeContextToolRuntime:
                 file_matches += 1
         return ResolvePolicyState(
             query_label=query,
-            repo_metadata=exploration.get_active_repo_metadata(),
+            repo_metadata=self._graph_session.repo_metadata(),
             candidate_limit=8,
             fuzzy_min_score=70.0,
             fuzzy_gap=5.0,
@@ -627,7 +642,7 @@ class IterativeContextToolRuntime:
             "query": symbol,
             "node": node,
             "anchor_decision": anchor_decision_to_dict(decision),
-            "full_graph": _serialize_active_graph(),
+            "full_graph": _serialize_session_graph(self._graph_session),
             **self._policy_payload_fields(),
         }
         if decision.candidates:
@@ -639,15 +654,10 @@ class IterativeContextToolRuntime:
     def _decision_node(self, decision: AnchorDecision) -> dict[str, Any] | None:
         if decision.status != "resolved" or decision.selected_anchor_id is None:
             return None
-        store = exploration.get_active_store()
-        if store is None:
-            return None
-        node = store._node_for_id(  # pyright: ignore[reportPrivateUsage]
-            decision.selected_anchor_id
-        )
+        node = self._graph_session.node_for_id(decision.selected_anchor_id)
         if node is None:
             return None
-        return _serialize_resolved_node(node)
+        return _serialize_resolved_node(node, self._graph_session)
 
     def _resolve_and_expand(
         self,
@@ -673,7 +683,7 @@ class IterativeContextToolRuntime:
             )
 
         self._graph_replay.note_expand_call()
-        graph = exploration.expand(
+        graph = self._graph_session.expand(
             decision.selected_anchor_id,
             depth=budget,
             score_fn=lookahead_policy,
@@ -887,7 +897,7 @@ def _validate_callable_signature(
         )
 
 
-_default_runtime = IterativeContextToolRuntime()
+_default_runtime = IterativeContextToolRuntime(graph_session=exploration.get_default_session())
 
 
 async def list_tools() -> list[Tool]:

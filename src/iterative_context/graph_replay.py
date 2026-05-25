@@ -90,6 +90,9 @@ class GraphReplayPayload:
     role: str | None = None
     attempt_id: str | None = None
     policy_id: str | None = None
+    source_signature: str | None = None
+    graph_signature: str | None = None
+    graph_builder: dict[str, object] | None = None
     metadata: dict[str, object] | None = None
     kind: str = GRAPH_REPLAY_KIND
     source: str = GRAPH_REPLAY_SOURCE
@@ -110,6 +113,12 @@ class GraphReplayPayload:
             payload["attemptId"] = self.attempt_id
         if self.policy_id is not None:
             payload["policyId"] = self.policy_id
+        if self.source_signature is not None:
+            payload["sourceSignature"] = self.source_signature
+        if self.graph_signature is not None:
+            payload["graphSignature"] = self.graph_signature
+        if self.graph_builder:
+            payload["graphBuilder"] = self.graph_builder
         if self.metadata:
             payload["metadata"] = self.metadata
         return payload
@@ -426,6 +435,9 @@ class GraphReplayRecorder:
         trace_id: str,
         metadata: dict[str, object] | None,
         policy_id: str | None,
+        source_signature: str | None = None,
+        graph_signature: str | None = None,
+        graph_builder: dict[str, object] | None = None,
         clear_after_collect: bool,
     ) -> dict[str, object]:
         trace = trace_id.strip()
@@ -442,6 +454,9 @@ class GraphReplayRecorder:
             role=self._optional_string(clean_metadata, "role"),
             attempt_id=self._optional_string(clean_metadata, "attempt_id"),
             policy_id=policy_id.strip() if policy_id else None,
+            source_signature=source_signature.strip() if isinstance(source_signature, str) and source_signature.strip() else None,
+            graph_signature=graph_signature.strip() if isinstance(graph_signature, str) and graph_signature.strip() else None,
+            graph_builder=dict(graph_builder) if isinstance(graph_builder, dict) else None,
             metadata=self._extension_metadata(clean_metadata),
             events=[dict(event) for event in self._events],
             summary=self._summary,
@@ -600,6 +615,11 @@ class GraphReplayRecorder:
                 "raw_prompt",
                 "source_snippet",
                 "env_vars",
+                "sourcesignature",
+                "graphsignature",
+                "graphbuilder",
+                "repoidentity",
+                "sessionid",
             }:
                 raise ValueError(f"metadata key {key!r} is not portable")
             clean[key] = self._sanitize_metadata_value(value, path=key)

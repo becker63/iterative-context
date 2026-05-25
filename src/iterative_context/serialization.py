@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from iterative_context.graph_models import Graph, GraphEdge, GraphNode
+from iterative_context.path_ids import file_for_node_id, node_label_for_id
 
 
 def _unwrap_node(data: Any) -> tuple[GraphNode, dict[str, Any]]:
@@ -26,12 +27,16 @@ def serialize_node(node: GraphNode, extras: dict[str, Any] | None = None) -> dic
 
     payload: dict[str, Any] = {
         "id": node.id,
-        "symbol": symbol_value if isinstance(symbol_value, str) else node.id,
+        "symbol": symbol_value if isinstance(symbol_value, str) else node_label_for_id(node.id),
         "kind": node.kind,
         "state": node.state,
     }
     if isinstance(file_value, str):
         payload["file"] = file_value
+    else:
+        inferred_file = file_for_node_id(node.id)
+        if inferred_file is not None:
+            payload["file"] = inferred_file
     tokens = getattr(node, "tokens", None)
     if tokens is not None:
         payload["tokens"] = tokens
