@@ -79,9 +79,36 @@ Expansion causality is preserved through emitted `addEdges` records from the sel
 
 Replay state is scoped to the in-process IC runtime session.
 
+One `IterativeContextToolRuntime` now owns one `GraphSession`.
+
+The session owns:
+
+- installed behavior policy
+- replay recorder
+- graph
+- graph store
+- repo identity metadata
+- source signature
+- graph signature
+
+Parallel attempts must use separate runtime/session objects. Graph state is not process-global.
+
 - sequential attempts must not leak stale events
 - collect-and-clear must reset the recorder
 - one session must not return another session's events
+
+If one runtime is reused sequentially, the caller must explicitly reset or reload the session before switching repositories or attempt context.
+
+## Identity
+
+Replay and visualization use four distinct identities:
+
+- `repo identity`: what repository/workspace was loaded
+- `sourceSignature`: what source contents IC scanned
+- `graphSignature`: what normalized graph IC derived
+- `session identity`: what isolated runtime/attempt produced the replay
+
+`sourceSignature` and `graphSignature` are derived inside IC. The evaluator agent and tool caller must not supply them.
 
 ## Portability
 
@@ -92,4 +119,11 @@ Replay payloads should avoid:
 - projection paths
 - secrets
 
-Prefer stable node IDs, repo-relative labels when available, and compact metadata.
+Prefer stable repo-relative node IDs and compact metadata.
+
+Examples:
+
+- `file:src/foo.py`
+- `function:src/foo.py::bar`
+- `symbol:bar@src/foo.py`
+- `module:networkx`

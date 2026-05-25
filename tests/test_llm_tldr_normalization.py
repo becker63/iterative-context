@@ -46,7 +46,26 @@ def test_functions_have_ids(repo: tuple[str, Path]) -> None:
         for fn in raw_file.functions:
             assert fn.id, f"{name} function missing id in {raw_file.path}"
             assert fn.name, f"{name} function missing name in {raw_file.path}"
-            assert Path(fn.file).exists(), f"{name} function file missing: {fn.file}"
+            assert (path / fn.file).exists(), f"{name} function file missing: {fn.file}"
+            assert fn.id.startswith("function:"), f"{name} function id not portable: {fn.id}"
+
+
+def test_call_symbol_targets_are_file_qualified(repo: tuple[str, Path]) -> None:
+    _, path = repo
+
+    tree = ingest_repo(path)
+
+    call_targets = [
+        edge.target
+        for raw_file in tree.files
+        for edge in raw_file.edges
+        if edge.kind == "call" and edge.target.startswith("symbol:")
+    ]
+
+    assert call_targets
+    assert all("@" in target for target in call_targets)
+    assert all(not target.startswith("symbol:/") for target in call_targets)
+    assert all("/tmp/" not in target and "/home/" not in target and "/Users/" not in target for target in call_targets)
 
 
 def test_imports_are_strings(repo: tuple[str, Path]) -> None:

@@ -628,8 +628,10 @@ async def test_runtimes_isolate_repos(two_repos: tuple[Path, Path], tmp_path: Pa
     assert symbols_a == {"alpha_symbol"}
     assert symbols_b == {"beta_symbol"}
     assert full_a["metadata"]["graphSignature"] != full_b["metadata"]["graphSignature"]
-    assert full_a["metadata"]["repoIdentity"]["repoRoot"].endswith("repo_a")
-    assert full_b["metadata"]["repoIdentity"]["repoRoot"].endswith("repo_b")
+    assert "repoRoot" not in full_a["metadata"]["repoIdentity"]
+    assert "repoRoot" not in full_b["metadata"]["repoIdentity"]
+    assert full_a["metadata"]["repoIdentity"]["workspaceKind"] in {"git", "filesystem"}
+    assert full_b["metadata"]["repoIdentity"]["workspaceKind"] in {"git", "filesystem"}
 
 
 @pytest.mark.anyio

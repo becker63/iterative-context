@@ -27,8 +27,8 @@ def test_serialize_graph_summary_is_much_smaller_than_full_graph() -> None:
         graph.nodes[node_id]["symbol"] = f"symbol_{index}"
         graph.nodes[node_id]["file"] = f"src/pkg/module_{index % 5}.py"
 
-    full = serialize_graph(graph, metadata={"repo_root": "/repo"})
-    summary = serialize_graph_summary(graph, metadata={"repo_root": "/repo"})
+    full = serialize_graph(graph, metadata={})
+    summary = serialize_graph_summary(graph, metadata={})
 
     full_bytes = len(json.dumps(full))
     summary_bytes = len(json.dumps(summary))

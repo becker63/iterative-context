@@ -150,7 +150,7 @@ def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
                 edges.append(
                     RawEdge(
                         source=qualified_name,
-                        target=symbol_node_id(called),
+                        target=symbol_node_id(called, rel_path, root),
                         kind="call",
                     )
                 )
@@ -159,7 +159,7 @@ def ingest_repo(root: Path) -> RawTree:  # noqa: PLR0912
             edges.append(
                 RawEdge(
                     source=function_node_id(rel_path, src, root),
-                    target=symbol_node_id(target),
+                    target=symbol_node_id(target, rel_path, root),
                     kind="call",
                 )
             )

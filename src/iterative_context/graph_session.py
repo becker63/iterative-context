@@ -38,7 +38,6 @@ class RepoIdentity:
 
     def to_payload(self) -> dict[str, object]:
         payload: dict[str, object] = {
-            "repoRoot": self.repo_root.as_posix(),
             "workspaceKind": self.workspace_kind or "filesystem",
         }
         if self.repo_url:
@@ -285,7 +284,6 @@ class GraphSession:
             graph_builder_id=self.graph_builder_id,
             normalization_version=self.normalization_version,
         )
-        graph.graph["repo_root"] = identity.repo_root.as_posix()
         graph.graph["source_signature"] = source_sig
         graph.graph["graph_signature"] = graph_sig
         self.repo_root = root
@@ -407,7 +405,6 @@ class GraphSession:
         payload = self.graph_identity_payload()
         if self.repo_identity is not None:
             payload["repoIdentity"] = self.repo_identity.to_payload()
-            payload["repo_root"] = self.repo_identity.repo_root.as_posix()
         if self.graph_signature:
             payload["repo_signature"] = self.graph_signature
         return payload

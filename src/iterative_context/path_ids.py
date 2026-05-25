@@ -34,8 +34,16 @@ def module_node_id(module: str) -> str:
     return f"{MODULE_PREFIX}{module.strip()}"
 
 
-def symbol_node_id(symbol: str) -> str:
-    return f"{SYMBOL_PREFIX}{symbol.strip()}"
+def symbol_node_id(
+    symbol: str,
+    path: str | Path | None = None,
+    repo_root: str | Path | None = None,
+) -> str:
+    cleaned_symbol = symbol.strip()
+    if path is None or repo_root is None:
+        return f"{SYMBOL_PREFIX}{cleaned_symbol}"
+    rel = repo_relative_path(path, repo_root)
+    return f"{SYMBOL_PREFIX}{cleaned_symbol}@{rel}"
 
 
 def type_node_id(name: str) -> str:
@@ -56,6 +64,10 @@ def node_label_for_id(node_id: str) -> str:
     if node_id.startswith(FUNCTION_PREFIX):
         _, _, function_name = node_id[len(FUNCTION_PREFIX) :].partition("::")
         return function_name or node_id
+    if node_id.startswith(SYMBOL_PREFIX):
+        symbol_value = node_id[len(SYMBOL_PREFIX) :]
+        symbol_name, _, _ = symbol_value.partition("@")
+        return symbol_name or node_id
     for prefix in (FILE_PREFIX, MODULE_PREFIX, SYMBOL_PREFIX, TYPE_PREFIX):
         if node_id.startswith(prefix):
             return node_id[len(prefix) :]
@@ -67,6 +79,9 @@ def file_for_node_id(node_id: str) -> str | None:
         return node_id[len(FILE_PREFIX) :]
     if node_id.startswith(FUNCTION_PREFIX):
         rel_path, _, _ = node_id[len(FUNCTION_PREFIX) :].partition("::")
+        return rel_path or None
+    if node_id.startswith(SYMBOL_PREFIX):
+        _, _, rel_path = node_id[len(SYMBOL_PREFIX) :].partition("@")
         return rel_path or None
     return None
 

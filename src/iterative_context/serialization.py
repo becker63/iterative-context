@@ -74,15 +74,6 @@ def serialize_graph(graph: Graph, metadata: dict[str, Any] | None = None) -> dic
     return {"nodes": nodes, "edges": edges, "metadata": metadata or {}}
 
 
-def _relativize_path(path: str, repo_root: str | None) -> str:
-    normalized = path.replace("\\", "/")
-    if repo_root:
-        root = repo_root.rstrip("/") + "/"
-        if normalized.startswith(root):
-            return normalized[len(root) :]
-    return normalized
-
-
 def serialize_graph_summary(
     graph: Graph | None,
     metadata: dict[str, Any] | None = None,
@@ -96,9 +87,6 @@ def serialize_graph_summary(
     expand/resolve_and_expand for neighborhood detail.
     """
     meta = dict(metadata or {})
-    repo_root = meta.get("repo_root")
-    repo_root_str = repo_root if isinstance(repo_root, str) else None
-
     if graph is None:
         return {
             "format": "summary_v1",
@@ -127,11 +115,11 @@ def serialize_graph_summary(
 
         file_value = extras.get("file")
         if isinstance(file_value, str) and file_value.strip():
-            files.add(_relativize_path(file_value.strip(), repo_root_str))
+            files.add(file_value.strip().replace("\\", "/"))
         else:
-            node_id = str(node_obj.id)
-            if node_id.endswith(".py") or "/" in node_id:
-                files.add(_relativize_path(node_id, repo_root_str))
+            inferred_file = file_for_node_id(str(node_obj.id))
+            if inferred_file is not None:
+                files.add(inferred_file.replace("\\", "/"))
 
         symbol_value = extras.get("symbol")
         if isinstance(symbol_value, str) and symbol_value.strip():

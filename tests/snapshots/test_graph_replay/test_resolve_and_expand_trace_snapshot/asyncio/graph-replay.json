@@ -201,7 +201,7 @@
   "policyId": "policy-v1",
   "role": "challenger",
   "source": "iterative-context",
-  "sourceSignature": "sha256:568cd5d0cca522cfb309b9ac91639d6eb135480eea88e028faceac2885790d3c",
+  "sourceSignature": "sha256:674aad5e7946076ca153f5d292c76eabedef3aa8e737bb76d658a0d10bdb0cbc",
   "summary": {
     "anchorAmbiguous": 0,
     "anchorNotFound": 0,
