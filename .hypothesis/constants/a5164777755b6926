@@ -1,4 +1,0 @@
-# file: /home/becker/projects/searchbench-go/src/iterative-context/src/iterative_context/validate_policy.py
-# hypothesis_version: 6.151.9
-
-['--json', '--policy-id', '--policy-path', '--symbol', '__main__', '```', 'active_score_id', 'callable_symbol', 'dummy-symbol', 'empty_policy', 'error', 'hint', 'install_score', 'install_verify', 'load_policy', 'markdown_fence', 'message', 'name', 'ok', 'policy file is empty', 'policy_id', 'policy_path', 'resolve', 'score_source', 'sha256', 'stage', 'stages', 'store_true', 'strict smoke failed', 'strict_tool_smoke', 'symbol', 'utf-8', 'validation failed', 'verify_score']
