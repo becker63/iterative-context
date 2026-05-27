@@ -234,6 +234,24 @@ async def test_call_tool_resolve_accepts_query_alias(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
+async def test_call_tool_resolve_reports_query_history_on_repeat(tmp_path: Path) -> None:
+    _activate_graph_with_symbols()
+    await _install_test_policy(tmp_path)
+
+    first = await call_tool("resolve", {"symbol": "expand_node"})
+    first_payload = json.loads(first[0].text)
+    assert first_payload["query_history"]["seen_before"] is False
+    assert first_payload["query_history"]["call_index"] == 1
+
+    second = await call_tool("resolve", {"symbol": "expand_node"})
+    second_payload = json.loads(second[0].text)
+    assert second_payload["query_history"]["seen_before"] is True
+    assert second_payload["query_history"]["prior_calls"] == 1
+    assert second_payload["query_history"]["call_index"] == 2
+    assert second_payload["query_history"]["recommended_action"] == "reuse_existing_anchor_or_finalize"
+
+
+@pytest.mark.anyio
 async def test_call_tool_resolve_and_expand_accepts_query_and_default_depth(
     tmp_path: Path,
 ) -> None:
@@ -262,6 +280,30 @@ async def test_call_tool_resolve_and_expand(tmp_path: Path) -> None:
     assert payload["anchor_decision"]["status"] == "resolved"
     assert payload["full_graph"]["format"] == "summary_v1"
     assert payload["full_graph"]["node_count"] >= 1
+
+
+@pytest.mark.anyio
+async def test_call_tool_expand_reports_repeat_history(tmp_path: Path) -> None:
+    _activate_graph_with_symbols()
+    await _install_test_policy(tmp_path)
+
+    first = await call_tool("expand", {"node_id": "A", "depth": 1})
+    first_payload = json.loads(first[0].text)
+    assert first_payload["expand_history"]["seen_before"] is False
+    assert first_payload["graph"]["metadata"]["expand_history"]["seen_before"] is False
+
+    second = await call_tool("expand", {"node_id": "A", "depth": 1})
+    second_payload = json.loads(second[0].text)
+    history = second_payload["expand_history"]
+    assert history["seen_before"] is True
+    assert history["prior_calls"] == 1
+    assert history["prior_max_depth"] == 1
+    assert history["repeated_same_or_shallower"] is True
+    assert history["recommended_action"] == "do_not_repeat_same_or_shallower_expand"
+    assert (
+        second_payload["graph"]["metadata"]["expand_history"]["recommended_action"]
+        == "do_not_repeat_same_or_shallower_expand"
+    )
 
 
 @pytest.mark.anyio

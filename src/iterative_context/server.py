@@ -292,6 +292,9 @@ class IterativeContextToolRuntime:
         self._graph_session = graph_session or GraphSession(
             repo_root=Path(repo_root).resolve() if repo_root is not None else None
         )
+        self._resolve_query_counts: dict[str, int] = {}
+        self._expand_call_counts: dict[str, int] = {}
+        self._expand_max_depth: dict[str, int] = {}
 
     async def list_tools(self) -> list[Tool]:
         return _tool_definitions()
@@ -332,15 +335,19 @@ class IterativeContextToolRuntime:
             depth = _require_int(arguments, "depth")
             self._ensure_graph_ready()
             self._graph_replay.note_expand_call()
+            expand_history = self._note_expand_history(node_id, depth)
             graph = self._graph_session.expand(
                 node_id=node_id,
                 depth=depth,
                 score_fn=lookahead_policy,
                 observer=self._graph_replay,
             )
+            metadata = graph.setdefault("metadata", {})
+            metadata["expand_history"] = expand_history
             return {
                 "graph": graph,
                 "full_graph": _serialize_session_graph(self._graph_session),
+                "expand_history": expand_history,
                 **self._policy_payload_fields(),
             }
 
@@ -371,10 +378,56 @@ class IterativeContextToolRuntime:
     def clear_policy_install(self) -> None:
         self._installed_policy = None
         self._graph_replay.reset()
+        self._clear_runtime_history()
 
     def reset_graph_session(self) -> None:
         self._graph_session.reset(clear_repo_root=False)
         self._graph_replay.reset()
+        self._clear_runtime_history()
+
+    def _clear_runtime_history(self) -> None:
+        self._resolve_query_counts.clear()
+        self._expand_call_counts.clear()
+        self._expand_max_depth.clear()
+
+    def _note_query_history(self, symbol: str) -> dict[str, object]:
+        prior_calls = self._resolve_query_counts.get(symbol, 0)
+        self._resolve_query_counts[symbol] = prior_calls + 1
+        seen_before = prior_calls > 0
+        return {
+            "seen_before": seen_before,
+            "prior_calls": prior_calls,
+            "call_index": prior_calls + 1,
+            "recommended_action": (
+                "reuse_existing_anchor_or_finalize" if seen_before else "fresh_query"
+            ),
+        }
+
+    def _note_expand_history(self, node_id: str, depth: int) -> dict[str, object]:
+        prior_calls = self._expand_call_counts.get(node_id, 0)
+        prior_max_depth = self._expand_max_depth.get(node_id)
+        self._expand_call_counts[node_id] = prior_calls + 1
+        if prior_max_depth is None or depth > prior_max_depth:
+            self._expand_max_depth[node_id] = depth
+
+        seen_before = prior_calls > 0
+        repeated_same_or_shallower = prior_max_depth is not None and depth <= prior_max_depth
+        if repeated_same_or_shallower:
+            recommended_action = "do_not_repeat_same_or_shallower_expand"
+        elif seen_before:
+            recommended_action = "only_continue_if_new_symbol_requires_deeper_context"
+        else:
+            recommended_action = "fresh_expand"
+
+        return {
+            "seen_before": seen_before,
+            "prior_calls": prior_calls,
+            "call_index": prior_calls + 1,
+            "requested_depth": depth,
+            "prior_max_depth": prior_max_depth,
+            "repeated_same_or_shallower": repeated_same_or_shallower,
+            "recommended_action": recommended_action,
+        }
 
     def _policy_payload_fields(self) -> dict[str, object]:
         if self._installed_policy is None:
@@ -567,9 +620,10 @@ class IterativeContextToolRuntime:
     def _resolve_tool(self, arguments: dict[str, Any]) -> dict[str, Any]:
         symbol = _take_anchor_symbol(arguments)
         self._ensure_graph_ready()
+        query_history = self._note_query_history(symbol)
         decision = self._resolve_anchor_decision(symbol)
         self._graph_replay.observe_anchor_decision(decision)
-        return self._resolve_payload_from_decision(symbol, decision)
+        return self._resolve_payload_from_decision(symbol, decision, query_history=query_history)
 
     def _resolve_anchor_decision(self, symbol: str) -> AnchorDecision:
         self._ensure_graph_ready()
@@ -638,6 +692,8 @@ class IterativeContextToolRuntime:
         *,
         include_graph: bool = False,
         graph: dict[str, Any] | None = None,
+        query_history: dict[str, object] | None = None,
+        expand_history: dict[str, object] | None = None,
     ) -> dict[str, Any]:
         node = self._decision_node(decision)
         payload: dict[str, Any] = {
@@ -647,10 +703,17 @@ class IterativeContextToolRuntime:
             "full_graph": _serialize_session_graph(self._graph_session),
             **self._policy_payload_fields(),
         }
+        if query_history is not None:
+            payload["query_history"] = query_history
         if decision.candidates:
             payload["candidates"] = _serialize_candidates(decision.candidates)
         if include_graph:
-            payload["graph"] = graph if graph is not None else _empty_expansion_graph()
+            graph_payload = graph if graph is not None else _empty_expansion_graph()
+            if expand_history is not None:
+                metadata = graph_payload.setdefault("metadata", {})
+                metadata["expand_history"] = expand_history
+                payload["expand_history"] = expand_history
+            payload["graph"] = graph_payload
         return payload
 
     def _decision_node(self, decision: AnchorDecision) -> dict[str, Any] | None:
@@ -670,6 +733,7 @@ class IterativeContextToolRuntime:
         budget = _take_depth(arguments, default=1)
         self._ensure_graph_ready()
 
+        query_history = self._note_query_history(symbol)
         decision = self._resolve_anchor_decision(symbol)
         self._graph_replay.observe_anchor_decision(decision)
         if (
@@ -682,9 +746,11 @@ class IterativeContextToolRuntime:
                 decision,
                 include_graph=True,
                 graph=_empty_expansion_graph(),
+                query_history=query_history,
             )
 
         self._graph_replay.note_expand_call()
+        expand_history = self._note_expand_history(decision.selected_anchor_id, budget)
         graph = self._graph_session.expand(
             decision.selected_anchor_id,
             depth=budget,
@@ -696,6 +762,8 @@ class IterativeContextToolRuntime:
             decision,
             include_graph=True,
             graph=cast(dict[str, Any], graph),
+            query_history=query_history,
+            expand_history=expand_history,
         )
 
 
