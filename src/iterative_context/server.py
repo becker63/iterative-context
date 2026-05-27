@@ -5,6 +5,7 @@ import importlib.util
 import inspect
 import json
 import math
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
@@ -38,6 +39,7 @@ from iterative_context.types import (
 server = Server("iterative-context")
 
 _DEPTH_FLOAT_TOLERANCE = 1e-9
+_DEFAULT_REPO_ROOT_ENV = "SEARCHBENCH_ITERATIVE_CONTEXT_REPO_ROOT"
 
 
 class ToolPayloadError(Exception):
@@ -897,7 +899,14 @@ def _validate_callable_signature(
         )
 
 
-_default_runtime = IterativeContextToolRuntime(graph_session=exploration.get_default_session())
+def _default_graph_session() -> GraphSession:
+    repo_root = os.environ.get(_DEFAULT_REPO_ROOT_ENV, "").strip()
+    if repo_root:
+        return GraphSession(repo_root=Path(repo_root).resolve())
+    return exploration.get_default_session()
+
+
+_default_runtime = IterativeContextToolRuntime(graph_session=_default_graph_session())
 
 
 async def list_tools() -> list[Tool]:

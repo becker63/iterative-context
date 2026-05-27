@@ -197,6 +197,14 @@ async def test_call_tool_resolve_serializes_node(tmp_path: Path) -> None:
     assert payload["full_graph"]["node_count"] >= 1
 
 
+def test_default_graph_session_uses_env_repo_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("SEARCHBENCH_ITERATIVE_CONTEXT_REPO_ROOT", str(tmp_path))
+    session = server._default_graph_session()
+    assert session.repo_root == tmp_path.resolve()
+
+
 @pytest.mark.anyio
 async def test_call_tool_expand_returns_graph(tmp_path: Path) -> None:
     _activate_graph_with_symbols()
